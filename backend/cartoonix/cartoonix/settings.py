@@ -44,7 +44,7 @@ INSTALLED_APPS = [
     'widget_tweaks',
     'channels',
     'chat',
-    'drf_yasg',   
+    'drf_yasg',
 ]
 
 MIDDLEWARE = [
@@ -200,7 +200,7 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
 }
 
-REDIS_HOST = 'localhost'
+REDIS_HOST = 'redis'
 REDIS_PORT = '6379'
 
 CHANNEL_LAYERS = {
@@ -229,5 +229,3 @@ SWAGGER_SETTINGS = {
         'rest_framework.renderers.JSONRenderer',
     ],
 }
-
-
