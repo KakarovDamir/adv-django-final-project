@@ -1,0 +1,139 @@
+version: '3.8'
+
+services:
+  # Backend service (Django)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend:/app
+      - backend_static:/app/static
+      - backend_media:/app/media
+      - backend_logs:/app/cartoonix/logs
+    environment:
+      - DEBUG=True
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/cartoonix
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONPATH=/app:/app/cartoonix
+      - DJANGO_SETTINGS_MODULE=cartoonix.settings
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    # Use direct path to the manage.py script
+    command: python /app/cartoonix/manage.py runserver 0.0.0.0:8000
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    restart: unless-stopped
+
+  # Celery worker for async tasks
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend:/app
+      - backend_logs:/app/cartoonix/logs
+    environment:
+      - DEBUG=True
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/cartoonix
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONPATH=/app:/app/cartoonix
+      - DJANGO_SETTINGS_MODULE=cartoonix.settings
+    depends_on:
+      - backend
+      - db
+      - redis
+    command: sh -c "cd /app && celery -A cartoonix worker -l info"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    restart: unless-stopped
+
+  # Celery beat for scheduled tasks
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend:/app
+      - backend_logs:/app/cartoonix/logs
+    environment:
+      - DEBUG=True
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/cartoonix
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONPATH=/app:/app/cartoonix
+      - DJANGO_SETTINGS_MODULE=cartoonix.settings
+    depends_on:
+      - backend
+      - db
+      - redis
+    command: sh -c "cd /app && celery -A cartoonix beat -l info"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
+
+  # Frontend service (React)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000/api
+    depends_on:
+      - backend
+    command: npm start
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    restart: unless-stopped
+
+  # PostgreSQL Database
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=cartoonix
+    ports:
+      - "5432:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    restart: unless-stopped
+
+  # Redis for caching and as a message broker
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_static:
+  backend_media:
+  backend_logs:
