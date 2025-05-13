@@ -21,6 +21,7 @@ services:
       - PYTHONPATH=/app:/app/cartoonix
       - DJANGO_SETTINGS_MODULE=cartoonix.settings
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ALLOWED_HOSTS=localhost,127.0.0.1,138.68.87.67
     ports:
       - "8000:8000"
     depends_on:
@@ -79,7 +80,7 @@ services:
       - backend
       - db
       - redis
-    command: sh -c "mkdir -p /app/celerybeat && chmod 777 /app/celerybeat && cd /app && celery -A cartoonix beat -l info --schedule=/app/celerybeat/celerybeat-schedule"
+    command: sh -c "mkdir -p /app/celerybeat && touch /app/celerybeat/celerybeat-schedule && chmod -R 777 /app/celerybeat && cd /app && celery -A cartoonix beat -l info --schedule=/app/celerybeat/celerybeat-schedule"
     deploy:
       resources:
         limits:
