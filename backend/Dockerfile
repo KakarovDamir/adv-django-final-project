@@ -40,11 +40,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY . .
 
-# Create necessary directories for logs
+# Create necessary directories and set permissions
 RUN mkdir -p /app/cartoonix/logs && \
+    mkdir -p /app/cartoonix/data && \
     touch /app/cartoonix/logs/api_access.log && \
     touch /app/cartoonix/logs/debug.log && \
-    touch /app/cartoonix/logs/error.log
+    touch /app/cartoonix/logs/error.log && \
+    chmod -R 755 /app/cartoonix/logs && \
+    chmod -R 755 /app/cartoonix/data
 
 # Make sure the Django management command is executable
 RUN chmod +x cartoonix/manage.py

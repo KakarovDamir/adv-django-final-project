@@ -11,6 +11,9 @@ services:
       - backend_static:/app/static
       - backend_media:/app/media
       - backend_logs:/app/cartoonix/logs
+      - backend_data:/app/cartoonix/data
+    env_file:
+      - .env
     environment:
       - DEBUG=True
       - DATABASE_URL=postgres://postgres:postgres@db:5432/cartoonix
@@ -22,7 +25,6 @@ services:
     depends_on:
       - db
       - redis
-    # Use direct path to the manage.py script
     command: python /app/cartoonix/manage.py runserver 0.0.0.0:8000
     deploy:
       resources:
@@ -137,3 +139,4 @@ volumes:
   backend_static:
   backend_media:
   backend_logs:
+  backend_data:
