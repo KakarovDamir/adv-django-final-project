@@ -7,6 +7,7 @@ from django.db.models.signals import post_save
 from ai.models import VideoPrompt
 from django import forms
 from django.dispatch import receiver
+from django.contrib.postgres.indexes import GinIndex, BrinIndex
 
 logger = logging.getLogger('model_logger')
 
@@ -18,6 +19,15 @@ class Post(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE)
     image = models.ImageField(default='default_post.jpg', upload_to='post_pics')
     likes = models.ManyToManyField(User, related_name='liked_posts', blank=True)
+
+    class Meta:
+        indexes = [
+            GinIndex(fields=['title'], name='post_title_gin_idx', opclasses=['gin_trgm_ops']),
+            GinIndex(fields=['content'], name='post_content_gin_idx', opclasses=['gin_trgm_ops']),
+            BrinIndex(fields=['created_at'], name='post_created_at_brin_idx'),
+            models.Index(fields=['author'], name='sn_post_author_idx'),
+            models.Index(fields=['title'], name='sn_post_title_btree_idx'),
+        ]
 
     def __str__(self):
         return self.title
@@ -41,6 +51,14 @@ class Comment(models.Model):
     post = models.ForeignKey(Post, related_name='comments', on_delete=models.CASCADE)
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comments')
 
+    class Meta:
+        indexes = [
+            GinIndex(fields=['content'], name='comment_content_gin_idx', opclasses=['gin_trgm_ops']),
+            BrinIndex(fields=['created_at'], name='comment_created_at_brin_idx'),
+            models.Index(fields=['post'], name='sn_comment_post_idx'),
+            models.Index(fields=['author'], name='sn_comment_author_idx'),
+        ]
+
     def __str__(self):
         return f"Comment by {self.author} on {self.post}"
 
@@ -56,6 +74,12 @@ class Profile(models.Model):
     bio = models.TextField(blank=True, null=True)
     friends = models.ManyToManyField('self', symmetrical=False, related_name='user_friends', blank=True)
     image = models.ImageField(upload_to='profile_images/', blank=True, null=True)
+
+    class Meta:
+        indexes = [
+            GinIndex(fields=['bio'], name='profile_bio_gin_idx', opclasses=['gin_trgm_ops']),
+            models.Index(fields=['user'], name='sn_profile_user_idx'),
+        ]
 
     def __str__(self):
         return f'{self.user.username} Profile'
@@ -107,6 +131,12 @@ class FriendRequest(models.Model):
 
     class Meta:
         unique_together = ('from_user', 'to_user')
+        indexes = [
+            BrinIndex(fields=['created_at'], name='freq_created_brin_idx'),
+            models.Index(fields=['from_user'], name='sn_freq_from_user_idx'),
+            models.Index(fields=['to_user'], name='sn_freq_to_user_idx'),
+            models.Index(fields=['is_accepted'], name='sn_freq_is_accepted_idx'),
+        ]
 
     def __str__(self):
         return f"Friend request from {self.from_user} to {self.to_user}"
@@ -124,6 +154,13 @@ class Notification(models.Model):
 
     class Meta:
         ordering = ['-timestamp']
+        indexes = [
+            BrinIndex(fields=['timestamp'], name='notif_ts_brin_idx'),
+            models.Index(fields=['recipient'], name='sn_notif_recipient_idx'),
+            models.Index(fields=['actor'], name='sn_notif_actor_idx'),
+            models.Index(fields=['read'], name='sn_notif_read_idx'),
+            models.Index(fields=['target_content_type', 'target_object_id'], name='sn_notif_target_idx'),
+        ]
 
     def __str__(self):
         return f"Notification: {self.actor} {self.verb} to {self.recipient}"
