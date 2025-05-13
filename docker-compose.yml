@@ -20,6 +20,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - PYTHONPATH=/app:/app/cartoonix
       - DJANGO_SETTINGS_MODULE=cartoonix.settings
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     ports:
       - "8000:8000"
     depends_on:
@@ -46,6 +47,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - PYTHONPATH=/app:/app/cartoonix
       - DJANGO_SETTINGS_MODULE=cartoonix.settings
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - backend
       - db
@@ -71,6 +73,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - PYTHONPATH=/app:/app/cartoonix
       - DJANGO_SETTINGS_MODULE=cartoonix.settings
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - backend
       - db
