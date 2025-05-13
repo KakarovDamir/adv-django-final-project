@@ -1,21 +1,25 @@
 from django.contrib.auth import authenticate, login, logout
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.middleware.csrf import get_token
 from .serializers import UserSerializer, NotificationSerializer, PostSerializer, CommentSerializer, ProfileSerializer, ProfileUpdateSerializer
 from .models import Notification, Post, Comment, FriendRequest, Profile
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from django.views.decorators.csrf import csrf_protect
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
+from rest_framework.permissions import AllowAny
+from rest_framework.decorators import permission_classes
 
 
 @ensure_csrf_cookie
 def get_csrf(request):
     return JsonResponse({'message': 'CSRF cookie set'})
 
+@csrf_protect
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def api_login(request):
     username = request.data.get('username')
     password = request.data.get('password')
