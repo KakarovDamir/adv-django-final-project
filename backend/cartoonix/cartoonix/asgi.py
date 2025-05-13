@@ -1,27 +1,28 @@
-"""
-ASGI config for cartoonix project.
-
-It exposes the ASGI callable as a module-level variable named ``application``.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/5.1/howto/deployment/asgi/
-"""
-
 import os
+import sys
+import django
+import logging
+
+# Добавляем родительскую папку, чтобы Python видел videochat и другие модули
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
-from chat.routing import websocket_urlpatterns
+import videochat.routing  # ✅ теперь работает, потому что sys.path.append настроен
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cartoonix.settings')
+django.setup()
 
+async def error_app(scope, receive, send):
+    logging.error(f"🚨 No match for scope type: {scope['type']} path: {scope.get('path')}")
+    raise ValueError(f"No route found for scope type: {scope['type']} path: {scope.get('path')}")
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),
     "websocket": AuthMiddlewareStack(
         URLRouter(
-            websocket_urlpatterns
+            videochat.routing.websocket_urlpatterns
         )
     ),
 })
-

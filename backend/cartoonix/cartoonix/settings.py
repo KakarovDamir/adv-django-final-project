@@ -38,13 +38,15 @@ INSTALLED_APPS = [
     'daphne',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework.authtoken',
+    'corsheaders',
     'ai',
     'social_network',
     'rest_framework_simplejwt',
     'widget_tweaks',
     'channels',
-    'chat',
     'drf_yasg',
+    'videochat'
 ]
 
 MIDDLEWARE = [
@@ -55,7 +57,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'social_network.middleware.LoginRequiredMiddleware'
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
 ]
 
 ROOT_URLCONF = 'cartoonix.urls'
@@ -204,10 +207,10 @@ REDIS_HOST = 'redis'
 REDIS_PORT = '6379'
 
 CHANNEL_LAYERS = {
-    "default": {
+    'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
         },
     },
 }
@@ -215,6 +218,11 @@ CHANNEL_LAYERS = {
 CELERY_BROKER_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+]
 
 SWAGGER_SETTINGS = {
     'SECURITY_DEFINITIONS': {

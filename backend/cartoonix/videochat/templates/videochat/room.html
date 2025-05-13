@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div id="chat-log" class="mb-3 p-3 border rounded" style="height: 400px; overflow-y: scroll;">
+            {% for message in messages %}
+                <div class="mb-2">
+                    <strong>{{ message.user.username }}</strong>: {{ message.content }}
+                </div>
+            {% endfor %}
+        </div>
+
+        <input id="chat-message-input" type="text" class="form-control mb-2" size="100">
+        <button id="chat-message-submit" class="btn btn-primary">Send</button>
+
+        <button id="start-call" class="btn btn-success float-right">Start Video Call</button>
+    </div>
+    <div class="col-md-4">
+        <div class="border rounded p-3">
+            <h5>Participants</h5>
+            <ul id="user-list">
+                <!-- Will be populated via WebSocket -->
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div id="video-container" class="mt-3" style="display: none;">
+    <video id="local-video" autoplay muted class="border rounded" style="width: 300px;"></video>
+    <video id="remote-video" autoplay class="border rounded" style="width: 300px;"></video>
+    <button id="end-call" class="btn btn-danger">End Call</button>
+</div>
+
+{{ room.slug|json_script:"room-name" }}
+{{ request.user.username|json_script:"username" }}
+
+<script>
+    const roomName = JSON.parse(document.getElementById('room-name').textContent);
+    const username = JSON.parse(document.getElementById('username').textContent);
+
+    const chatSocket = new WebSocket(
+        `ws://${window.location.host}/ws/chat/${roomName}/`
+    );
+
+    const callSocket = new WebSocket(
+        `ws://${window.location.host}/ws/call/${roomName}/`
+    );
+
+    // Chat functionality
+    chatSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        document.querySelector('#chat-log').innerHTML += `
+            <div class="mb-2">
+                <strong>${data.username}</strong>: ${data.message}
+            </div>
+        `;
+        document.querySelector('#chat-log').scrollTop = document.querySelector('#chat-log').scrollHeight;
+    };
+
+    document.querySelector('#chat-message-submit').onclick = function(e) {
+        const messageInputDom = document.querySelector('#chat-message-input');
+        const message = messageInputDom.value;
+        chatSocket.send(JSON.stringify({
+            'message': message,
+            'username': username
+        }));
+        messageInputDom.value = '';
+    };
+
+    // Video call functionality
+    let localStream;
+    let remoteStream;
+    let peerConnection;
+    const configuration = {'iceServers': [{'urls': 'stun:stun.l.google.com:19302'}]};
+
+    document.querySelector('#start-call').onclick = async function() {
+        document.querySelector('#video-container').style.display = 'block';
+
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+            document.querySelector('#local-video').srcObject = localStream;
+
+            peerConnection = new RTCPeerConnection(configuration);
+
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
+
+            peerConnection.ontrack = function(event) {
+                remoteStream = event.streams[0];
+                document.querySelector('#remote-video').srcObject = remoteStream;
+            };
+
+            peerConnection.onicecandidate = function(event) {
+                if (event.candidate) {
+                    callSocket.send(JSON.stringify({
+                        'type': 'ice_candidate',
+                        'candidate': event.candidate,
+                        'username': username
+                    }));
+                }
+            };
+
+            // Create offer
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+
+            callSocket.send(JSON.stringify({
+                'type': 'offer',
+                'offer': offer,
+                'username': username
+            }));
+
+        } catch (error) {
+            console.error('Error starting call:', error);
+        }
+    };
+
+    callSocket.onmessage = async function(e) {
+        const data = JSON.parse(e.data);
+
+        if (data.type === 'offer') {
+            if (!peerConnection) {
+                try {
+                    localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+                    document.querySelector('#local-video').srcObject = localStream;
+                    document.querySelector('#video-container').style.display = 'block';
+
+                    peerConnection = new RTCPeerConnection(configuration);
+
+                    localStream.getTracks().forEach(track => {
+                        peerConnection.addTrack(track, localStream);
+                    });
+
+                    peerConnection.ontrack = function(event) {
+                        remoteStream = event.streams[0];
+                        document.querySelector('#remote-video').srcObject = remoteStream;
+                    };
+
+                    peerConnection.onicecandidate = function(event) {
+                        if (event.candidate) {
+                            callSocket.send(JSON.stringify({
+                                'type': 'ice_candidate',
+                                'candidate': event.candidate,
+                                'username': username
+                            }));
+                        }
+                    };
+
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+
+                    callSocket.send(JSON.stringify({
+                        'type': 'answer',
+                        'answer': answer,
+                        'username': username
+                    }));
+
+                } catch (error) {
+                    console.error('Error answering call:', error);
+                }
+            }
+        } else if (data.type === 'answer' && peerConnection) {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+        } else if (data.type === 'ice_candidate' && peerConnection) {
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            } catch (error) {
+                console.error('Error adding ICE candidate:', error);
+            }
+        }
+    };
+
+    document.querySelector('#end-call').onclick = function() {
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
+        }
+
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+            document.querySelector('#local-video').srcObject = null;
+        }
+
+        if (remoteStream) {
+            remoteStream.getTracks().forEach(track => track.stop());
+            document.querySelector('#remote-video').srcObject = null;
+        }
+
+        document.querySelector('#video-container').style.display = 'none';
+    };
+</script>
+{% endblock %}
