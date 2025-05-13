@@ -80,7 +80,8 @@ services:
       - backend
       - db
       - redis
-    command: sh -c "mkdir -p /app/celerybeat && touch /app/celerybeat/celerybeat-schedule && chmod -R 777 /app/celerybeat && cd /app && celery -A cartoonix beat -l info --schedule=/app/celerybeat/celerybeat-schedule"
+    user: root
+    command: sh -c "mkdir -p /app/celerybeat && chown -R nobody:nogroup /app/celerybeat && chmod -R 777 /app/celerybeat && cd /app && celery -A cartoonix beat -l info --schedule=/app/celerybeat/celerybeat-schedule"
     deploy:
       resources:
         limits:
