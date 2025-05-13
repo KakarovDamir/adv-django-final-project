@@ -49,6 +49,10 @@ RUN mkdir -p /app/cartoonix/logs && \
     chmod -R 755 /app/cartoonix/logs && \
     chmod -R 755 /app/cartoonix/data
 
+RUN mkdir -p /app/cartoonix/celery && \
+    touch /app/cartoonix/celery/celerybeat-schedule && \
+    chmod -R 755 /app/cartoonix/celery
+
 # Make sure the Django management command is executable
 RUN chmod +x cartoonix/manage.py
 
