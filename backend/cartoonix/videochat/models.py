@@ -1,14 +1,16 @@
-from django.db import models
 from django.contrib.auth import get_user_model
-from django.utils import timezone
+from django.contrib.postgres.indexes import BrinIndex, GinIndex
 from django.contrib.postgres.search import SearchVector
-from django.contrib.postgres.indexes import GinIndex, BrinIndex
+from django.db import models
+from django.utils import timezone
 
 User = get_user_model()
+
 
 class ChatRoom(models.Model):
     name = models.CharField(max_length=255)
     participants = models.ManyToManyField(User, related_name='chat_rooms')
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         indexes = [
@@ -17,6 +19,7 @@ class ChatRoom(models.Model):
 
     def __str__(self):
         return self.name
+
 
 class Message(models.Model):
     room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name='messages')
