@@ -1,11 +1,10 @@
-from django.contrib.auth.models import User
 from ai.models import VideoPrompt
-from .models import Comment, Profile
-from rest_framework import serializers
-from .models import Post, Notification, FriendRequest, User
-from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
+from rest_framework import serializers
+
+from .models import Comment, FriendRequest, Notification, Post, Profile, User
+
 
 class VideoPromptSerializer(serializers.ModelSerializer):
     class Meta:
@@ -155,7 +154,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             'bio', 'avatar', 'birth_date', 'friends_count',
             'posts_count', 'is_friend'
         ]
-        read_only_fields = ['id', 'username', 'email', 'friends_count', 'posts_count']
+        read_only_fields = ['id', 'username', 'email', 'friends_count', 'posts_count', 'is_friend']
 
     def get_friends_count(self, obj):
         return obj.friends.count()
@@ -199,27 +198,13 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
 
 
 class FriendRequestSerializer(serializers.ModelSerializer):
-    from_user = serializers.SerializerMethodField()
-    to_user = serializers.SerializerMethodField()
-
+    from_user = ProfileSerializer(source='from_user.profile', read_only=True)
+    to_user = ProfileSerializer(source='to_user.profile', read_only=True)
+    
     class Meta:
         model = FriendRequest
         fields = ['id', 'from_user', 'to_user', 'created_at']
         read_only_fields = ['id', 'created_at']
-
-    def get_from_user(self, obj):
-        return {
-            'id': obj.from_user.id,
-            'username': obj.from_user.username,
-            'avatar': obj.from_user.profile.avatar.url if obj.from_user.profile.avatar else None
-        }
-
-    def get_to_user(self, obj):
-        return {
-            'id': obj.to_user.id,
-            'username': obj.to_user.username,
-            'avatar': obj.to_user.profile.avatar.url if obj.to_user.profile.avatar else None
-        }
 
 class FriendSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()

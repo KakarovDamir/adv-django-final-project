@@ -27,7 +27,7 @@ services:
     depends_on:
       - db
       - redis
-    command: python /app/cartoonix/manage.py runserver 0.0.0.0:8000
+    command: sh -c "python /app/cartoonix/manage.py migrate && python /app/cartoonix/manage.py runserver 0.0.0.0:8000"
     deploy:
       resources:
         limits:

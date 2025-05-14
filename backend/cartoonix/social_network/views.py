@@ -1,17 +1,21 @@
-from django.contrib.auth import authenticate, login, logout
-from django.views.decorators.csrf import ensure_csrf_cookie
-from .serializers import UserSerializer, NotificationSerializer, PostSerializer, CommentSerializer, ProfileSerializer, ProfileUpdateSerializer, RegisterSerializer
-from .models import Notification, Post, FriendRequest, Profile
-from rest_framework.decorators import api_view, permission_classes, authentication_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework import status
-from django.views.decorators.csrf import csrf_protect
-from django.shortcuts import get_object_or_404
-from rest_framework.authentication import SessionAuthentication, TokenAuthentication
-from django.contrib.auth import get_user_model
+from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.db.models import Q
 from django.http import JsonResponse
-from rest_framework.permissions import AllowAny
+from django.shortcuts import get_object_or_404
+from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
+from rest_framework import status
+from rest_framework.authentication import (SessionAuthentication,
+                                           TokenAuthentication)
+from rest_framework.decorators import (api_view, authentication_classes,
+                                       permission_classes)
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+
+from .models import FriendRequest, Notification, Post, Profile
+from .serializers import (CommentSerializer, FriendRequestSerializer,
+                          NotificationSerializer, PostSerializer,
+                          ProfileSerializer, ProfileUpdateSerializer,
+                          RegisterSerializer, UserSerializer)
 
 
 @ensure_csrf_cookie
@@ -192,6 +196,20 @@ def send_friend_request(request, profile_id):
     )
     return Response({'message': 'Friend request sent'}, status=status.HTTP_201_CREATED)
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def remove_friend(request, profile_id):
+    other_profile = get_object_or_404(Profile, pk=profile_id)
+    current_profile = request.user.profile
+
+    if other_profile not in current_profile.friends.all():
+        return Response({'error': 'This user is not in your friends list'}, status=status.HTTP_400_BAD_REQUEST)
+
+    current_profile.friends.remove(other_profile)
+    other_profile.friends.remove(current_profile)
+
+    return Response({'message': 'Friend removed successfully'}, status=status.HTTP_200_OK)
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -224,9 +242,27 @@ def reject_friend_request(request, request_id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def friend_list(request):
-    friends = request.user.profile.friends.all()
-    serializer = ProfileSerializer(friends, many=True)
-    return Response(serializer.data)
+    """List friends and handle search queries"""
+    search_query = request.GET.get('search', '')
+    
+    if search_query:
+        # Search for users by username or bio
+        users = Profile.objects.filter(
+            Q(user__username__icontains=search_query) |
+            Q(bio__icontains=search_query)
+        ).exclude(user=request.user)
+        
+        # Add is_friend status to each user
+        for user in users:
+            user.is_friend = user in request.user.profile.friends.all()
+            
+        serializer = ProfileSerializer(users, many=True, context={'request': request})
+        return Response({'users': serializer.data})
+    else:
+        # Return just the friends list
+        friends = request.user.profile.friends.all()
+        serializer = ProfileSerializer(friends, many=True, context={'request': request})
+        return Response({'users': serializer.data})
 
 
 @api_view(['GET'])
@@ -294,5 +330,36 @@ def post_delete(request, pk):
 def current_user(request):
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def friend_request_list(request):
+    """List all friend requests for the current user"""
+    received_requests = FriendRequest.objects.filter(to_user=request.user)
+    sent_requests = FriendRequest.objects.filter(from_user=request.user)
+    
+    received_serializer = FriendRequestSerializer(received_requests, many=True)
+    sent_serializer = FriendRequestSerializer(sent_requests, many=True)
+    
+    return Response({
+        'received': received_serializer.data,
+        'sent': sent_serializer.data
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def search_users(request):
+    """Search for users by username or bio"""
+    query = request.GET.get('search', '')
+    if not query:
+        return Response({'users': []})
+        
+    users = Profile.objects.filter(
+        Q(user__username__icontains=query) |
+        Q(bio__icontains=query)
+    ).exclude(user=request.user)
+    
+    serializer = ProfileSerializer(users, many=True, context={'request': request})
+    return Response({'users': serializer.data})
 
 

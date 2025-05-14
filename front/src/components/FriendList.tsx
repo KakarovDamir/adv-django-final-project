@@ -1,18 +1,59 @@
-'use client';
-import { useEffect, useState } from 'react';
+"use client";
+import { useEffect, useState } from "react";
+
+interface User {
+  id: number;
+  username: string;
+  avatar?: string;
+  bio?: string;
+  is_friend: boolean;
+}
+
+interface FriendListResponse {
+  users: User[];
+}
 
 export default function FriendList() {
-  const [friends, setFriends] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [friends, setFriends] = useState<User[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     async function loadFriends() {
-      const res = await fetch(`http://localhost:8000/social_network/friends?search=${searchQuery}`);
-      const data = await res.json();
-      setFriends(data);
+      const res = await fetch(
+        `http://localhost:8000/social_network/friends/?search=${searchQuery}`,
+        {
+          credentials: "include",
+          headers: {
+            "X-CSRFToken":
+              document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "",
+          },
+        }
+      );
+      const data: FriendListResponse = await res.json();
+      setFriends(data.users);
     }
     loadFriends();
   }, [searchQuery]);
+
+  const handleRemoveFriend = async (friendId: number) => {
+    try {
+      await fetch(
+        `http://localhost:8000/social_network/friends/remove/${friendId}/`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "X-CSRFToken":
+              document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "",
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      setFriends(friends.filter((friend) => friend.id !== friendId));
+    } catch (error) {
+      console.error("Failed to remove friend:", error);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -23,19 +64,30 @@ export default function FriendList() {
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
       />
-      
+
       <div className="space-y-2">
-        {friends.map((friend: any) => (
-          <div 
-            key={friend.id}
-            className="flex justify-between items-center p-3 bg-violet-50 rounded-lg border border-violet-100 hover:bg-violet-100 transition-colors"
-          >
-            <span className="text-violet-700 font-medium">{friend.username}</span>
-            <button className="text-red-600 hover:text-red-700 px-3 py-1 rounded-md transition-colors">
-              Remove
-            </button>
+        {friends.length === 0 ? (
+          <div className="text-center text-violet-600 py-4">
+            No friends found
           </div>
-        ))}
+        ) : (
+          friends.map((friend) => (
+            <div
+              key={friend.id}
+              className="flex justify-between items-center p-3 bg-violet-50 rounded-lg border border-violet-100 hover:bg-violet-100 transition-colors"
+            >
+              <span className="text-violet-700 font-medium">
+                {friend.username}
+              </span>
+              <button
+                onClick={() => handleRemoveFriend(friend.id)}
+                className="text-red-600 hover:text-red-700 px-3 py-1 rounded-md transition-colors"
+              >
+                Remove
+              </button>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

@@ -1,20 +1,20 @@
-'use client';
-import { useActionState } from 'react';
-import { useRouter } from 'next/navigation';
+"use client";
+import { useRouter } from "next/navigation";
+import { useActionState } from "react";
 
 async function createPost(prevState: any, formData: FormData) {
   try {
-    const res = await fetch('http://localhost:8000/social_network/posts/', {
-      method: 'POST',
+    const res = await fetch("http://localhost:8000/social_network/posts/", {
+      method: "POST",
       headers: {
-        'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '',
+        "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "",
       },
       body: formData,
-      credentials: 'include'
+      credentials: "include",
     });
     return await res.json();
   } catch (error) {
-    return { error: 'Failed to create post' };
+    return { error: "Failed to create post" };
   }
 }
 
@@ -30,8 +30,19 @@ export default function CreatePostPage() {
             onClick={() => router.back()}
             className="flex items-center gap-2 text-violet-600 hover:text-violet-700 transition-colors"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
             </svg>
             Назад к списку постов
           </button>
@@ -41,10 +52,7 @@ export default function CreatePostPage() {
             Create New Post
           </h2>
 
-          <form
-            action={formAction}
-            encType="multipart/form-data"
-          >
+          <form action={formAction}>
             <div className="space-y-5">
               <div>
                 <label className="block text-violet-700 font-medium mb-2">
