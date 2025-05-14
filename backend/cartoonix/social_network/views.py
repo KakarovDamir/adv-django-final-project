@@ -3,6 +3,7 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
+from django.views.decorators.cache import cache_page
 from rest_framework import status
 from rest_framework.authentication import (SessionAuthentication,
                                            TokenAuthentication)
@@ -67,6 +68,7 @@ def api_register(request):
     }, status=status.HTTP_400_BAD_REQUEST)
 
 
+@cache_page(60 * 2)
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def post_list_create(request):
@@ -84,6 +86,7 @@ def post_list_create(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@cache_page(60 * 2)
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, CanEditOrDeletePost])
 def post_detail(request, pk):
@@ -108,6 +111,7 @@ def post_detail(request, pk):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@cache_page(60 * 1)
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def comment_list_create(request, post_id):
@@ -130,6 +134,7 @@ def comment_list_create(request, post_id):
 
 
 
+@cache_page(60 * 5)
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([AllowAny])
@@ -236,6 +241,7 @@ def reject_friend_request(request, request_id):
     return Response({'message': 'Friend request rejected'})
 
 
+@cache_page(60 * 5)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def friend_list(request):
@@ -262,6 +268,7 @@ def friend_list(request):
         return Response({'users': serializer.data})
 
 
+@cache_page(30)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def notification_list(request):
@@ -324,6 +331,7 @@ def current_user(request):
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
 
+@cache_page(30)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def friend_request_list(request):
@@ -339,6 +347,7 @@ def friend_request_list(request):
         'sent': sent_serializer.data
     })
 
+@cache_page(60 * 1)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def search_users(request):
@@ -356,6 +365,7 @@ def search_users(request):
     return Response({'users': serializer.data})
 
 
+@cache_page(60 * 2)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def user_posts(request, username):
@@ -364,6 +374,7 @@ def user_posts(request, username):
     serializer = PostSerializer(posts, many=True, context={'request': request})
     return Response(serializer.data)
 
+@cache_page(60 * 5)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def user_friends(request, username):

@@ -155,6 +155,17 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Cache settings
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"redis://{os.environ.get('REDIS_HOST', 'redis')}:{os.environ.get('REDIS_PORT', '6379')}/1", # DB 1 for cache
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
