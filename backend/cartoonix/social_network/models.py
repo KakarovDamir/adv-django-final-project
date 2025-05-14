@@ -43,6 +43,15 @@ class Post(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     likes = models.ManyToManyField(User, related_name='liked_posts', blank=True)
 
+    class Meta:
+        indexes = [
+            GinIndex(fields=['title'], name='post_title_gin_idx', opclasses=['gin_trgm_ops']),
+            GinIndex(fields=['content'], name='post_content_gin_idx', opclasses=['gin_trgm_ops']),
+            BrinIndex(fields=['created_at'], name='post_created_at_brin_idx'),
+            models.Index(fields=['author'], name='sn_post_author_idx'),
+            models.Index(fields=['title'], name='sn_post_title_btree_idx'),
+        ]
+
     def __str__(self):
         return self.title
 
@@ -55,6 +64,14 @@ class Comment(models.Model):
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        indexes = [
+            GinIndex(fields=['content'], name='comment_content_gin_idx', opclasses=['gin_trgm_ops']),
+            BrinIndex(fields=['created_at'], name='comment_created_at_brin_idx'),
+            models.Index(fields=['post'], name='sn_comment_post_idx'),
+            models.Index(fields=['author'], name='sn_comment_author_idx'),
+        ]
+
     def __str__(self):
         return f"Comment by {self.author.username} on {self.post.title}"
 
@@ -65,6 +82,12 @@ class FriendRequest(models.Model):
 
     class Meta:
         unique_together = ('from_user', 'to_user')
+        indexes = [
+            BrinIndex(fields=['created_at'], name='freq_created_brin_idx'),
+            models.Index(fields=['from_user'], name='sn_freq_from_user_idx'),
+            models.Index(fields=['to_user'], name='sn_freq_to_user_idx'),
+            models.Index(fields=['is_accepted'], name='sn_freq_is_accepted_idx'),
+        ]
 
     def __str__(self):
         return f"{self.from_user} to {self.to_user}"

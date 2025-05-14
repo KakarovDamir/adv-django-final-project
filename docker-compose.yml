@@ -6,6 +6,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: django_backend
     volumes:
       - ./backend:/app
       - backend_static:/app/static
@@ -16,7 +17,13 @@ services:
       - .env
     environment:
       - DEBUG=True
-      - DATABASE_URL=postgres://postgres:postgres@db:5432/cartoonix
+      - DB_NAME=cartoonix
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_REPLICA_HOST=db_replica
+      - DB_REPLICA_PORT=5432
       - REDIS_URL=redis://redis:6379/0
       - PYTHONPATH=/app:/app/cartoonix
       - DJANGO_SETTINGS_MODULE=cartoonix.settings
@@ -25,9 +32,19 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      db_replica:
+        condition: service_healthy
+      redis:
+        condition: service_started
     command: sh -c "python /app/cartoonix/manage.py migrate && python /app/cartoonix/manage.py runserver 0.0.0.0:8000"
+    healthcheck:
+      test: ["CMD", "python", "/healthcheck_django.py"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     deploy:
       resources:
         limits:
@@ -39,20 +56,28 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: celery_worker_1
     volumes:
       - ./backend:/app
       - backend_logs:/app/cartoonix/logs
     environment:
       - DEBUG=True
-      - DATABASE_URL=postgres://postgres:postgres@db:5432/cartoonix
+      - DB_NAME=cartoonix
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_HOST=db
+      - DB_PORT=5432
       - REDIS_URL=redis://redis:6379/0
       - PYTHONPATH=/app:/app/cartoonix
       - DJANGO_SETTINGS_MODULE=cartoonix.settings
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
-      - backend
-      - db
-      - redis
+      backend:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     command: sh -c "cd /app && celery -A cartoonix worker -l info"
     deploy:
       resources:
@@ -65,23 +90,30 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: celery_beat_scheduler
     volumes:
       - ./backend:/app
       - backend_logs:/app/cartoonix/logs
       - celery_beat_data:/app/celerybeat
     environment:
       - DEBUG=True
-      - DATABASE_URL=postgres://postgres:postgres@db:5432/cartoonix
+      - DB_NAME=cartoonix
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_HOST=db
+      - DB_PORT=5432
       - REDIS_URL=redis://redis:6379/0
       - PYTHONPATH=/app:/app/cartoonix
       - DJANGO_SETTINGS_MODULE=cartoonix.settings
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
-      - backend
-      - db
-      - redis
-    user: root
-    command: sh -c "mkdir -p /app/celerybeat && chown -R nobody:nogroup /app/celerybeat && chmod -R 777 /app/celerybeat && cd /app && celery -A cartoonix beat -l info --schedule=/app/celerybeat/celerybeat-schedule"
+      backend:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: sh -c "cd /app && celery -A cartoonix beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler"
     deploy:
       resources:
         limits:
@@ -93,6 +125,7 @@ services:
     build:
       context: ./front
       dockerfile: Dockerfile
+    container_name: react_frontend
     volumes:
       - ./front:/app
       - /app/node_modules
@@ -112,35 +145,63 @@ services:
   # PostgreSQL Database
   db:
     image: postgres:15
+    container_name: postgres_master
     volumes:
-      - postgres_data:/var/lib/postgresql/data/
+      - postgres_data_master:/var/lib/postgresql/data/
+      - ./postgres_master_conf/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./postgres_master_conf/pg_hba.conf:/etc/postgresql/pg_hba.conf
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=cartoonix
     ports:
       - "5432:5432"
-    deploy:
-      resources:
-        limits:
-          memory: 1G
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf", "-c", "hba_file=/etc/postgresql/pg_hba.conf"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cartoonix"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  db_replica:
+    image: postgres:15
+    container_name: postgres_replica
+    volumes:
+      - postgres_data_replica:/var/lib/postgresql/data/
+      - ./postgres_replica_conf/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./postgres_replica_conf/entrypoint.sh:/usr/local/bin/entrypoint.sh
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=cartoonix
+      - MASTER_HOST=db
+    ports:
+      - "5433:5432"
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/usr/local/bin/entrypoint.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cartoonix"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   # Redis for caching and as a message broker
   redis:
     image: redis:7
+    container_name: redis_cache
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    deploy:
-      resources:
-        limits:
-          memory: 512M
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  postgres_data_master:
+  postgres_data_replica:
   redis_data:
   backend_static:
   backend_media:

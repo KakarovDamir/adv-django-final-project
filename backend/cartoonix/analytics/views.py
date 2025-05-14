@@ -7,6 +7,7 @@ import base64
 from django.shortcuts import render
 from django.db.models import Count, Avg
 from social_network.models import Post
+from django.contrib.auth.decorators import login_required
 
 logger = logging.getLogger('dashboard_logger')
 
@@ -60,6 +61,7 @@ def generate_pie_chart(pie_data):
         return None
 
 
+@login_required
 def dashboard(request):
     user = request.user
     logger.info(f"Dashboard accessed by user {user.username}.")

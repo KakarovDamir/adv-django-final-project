@@ -34,6 +34,7 @@ RUN pip install Django==5.1.3 celery==5.4.0 redis==5.2.0 channels==4.0.0 daphne=
 
 # Install Python dependencies
 COPY requirements.txt .
+COPY healthcheck_django.py /healthcheck_django.py
 # Install dependencies excluding tbb package which causes issues
 RUN pip install --no-cache-dir -r requirements.txt
 

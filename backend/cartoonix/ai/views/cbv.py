@@ -14,11 +14,18 @@ import base64
 from moviepy import VideoFileClip, concatenate_videoclips
 import uuid
 import os
+from rest_framework.permissions import IsAuthenticated, DjangoModelPermissions
 
 logger = logging.getLogger('api_logger')
 
 
 class GenerateVideo(APIView):
+    permission_classes = [IsAuthenticated, DjangoModelPermissions]
+    queryset = VideoPrompt.objects.none()
+
+    def get_queryset(self):
+        return VideoPrompt.objects.none()
+
     @swagger_auto_schema(
         operation_summary="Generate video from user prompt",
         operation_description="This endpoint generates a video based on the given user prompt.",
@@ -126,6 +133,12 @@ class GenerateVideo(APIView):
 
 
 class VideoDetail(APIView):
+    permission_classes = [IsAuthenticated, DjangoModelPermissions]
+    queryset = VideoPrompt.objects.none()
+
+    def get_queryset(self):
+        return VideoPrompt.objects.none()
+
     @swagger_auto_schema(
         operation_summary="Retrieve a single video by ID",
         responses={

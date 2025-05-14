@@ -56,6 +56,7 @@ pillow==10.4.0
 proglog==0.1.10
 prompt_toolkit==3.0.48
 psutil==6.1.0
+psycopg2-binary
 ptyprocess==0.7.0
 pure_eval==0.2.3
 pydantic==2.9.2
@@ -91,3 +92,4 @@ wcwidth==0.2.13
 webencodings==0.5.1
 wheel==0.45.1
 zipp==3.20.2
+django-celery-beat
