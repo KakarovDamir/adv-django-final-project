@@ -1,11 +1,15 @@
 import logging
+
 import matplotlib
+
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import io
 import base64
+import io
+
+import matplotlib.pyplot as plt
+from django.contrib.auth.decorators import login_required
+from django.db.models import Avg, Count
 from django.shortcuts import render
-from django.db.models import Count, Avg
 from social_network.models import Post
 
 logger = logging.getLogger('dashboard_logger')
@@ -59,7 +63,7 @@ def generate_pie_chart(pie_data):
         logger.error(f"Error generating pie chart: {e}")
         return None
 
-
+@login_required
 def dashboard(request):
     user = request.user
     logger.info(f"Dashboard accessed by user {user.username}.")

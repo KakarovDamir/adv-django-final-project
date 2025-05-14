@@ -7,14 +7,14 @@ from ..models import FriendRequest, Post, Comment, PostForm, Profile, ProfileFor
 from ..serializers import PostSerializer, CommentSerializer
 from ..forms import ProfileUpdateForm, CommentForm, PostForm
 from ..signals import friend_request_sent, friend_request_accepted, post_liked, comment_added
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from django.contrib.auth.forms import UserCreationForm
 from django.http import Http404, JsonResponse
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.views.decorators.csrf import csrf_exempt
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
@@ -58,6 +58,10 @@ def post_list(request):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     elif request.method == 'POST':
+        if not request.user.has_perm('social_network.add_post'):
+            logger.warning(f"User {request.user} without 'add_post' permission attempted to create a post.")
+            return Response({"error": "You do not have permission to create posts."}, status=status.HTTP_403_FORBIDDEN)
+        
         serializer = PostSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(author=request.user)
@@ -97,9 +101,9 @@ def post_detail(request, post_id):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     elif request.method == 'PUT':
-        if post.author != request.user:
+        if not (post.author == request.user or request.user.has_perm('social_network.change_post')):
             logger.warning(f"User {request.user} attempted to edit post {post_id} without permission.")
-            return Response({"error": "You can only edit your own posts."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "You can only edit your own posts or you need specific permissions."}, status=status.HTTP_403_FORBIDDEN)
         serializer = PostSerializer(post, data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -109,9 +113,9 @@ def post_detail(request, post_id):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
-        if post.author != request.user:
+        if not (post.author == request.user or request.user.has_perm('social_network.delete_post')):
             logger.warning(f"User {request.user} attempted to delete post {post_id} without permission.")
-            return Response({"error": "You can only delete your own posts."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "You can only delete your own posts or you need specific permissions."}, status=status.HTTP_403_FORBIDDEN)
         post.delete()
         logger.info(f"User {request.user} deleted post {post_id}.")
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -143,6 +147,10 @@ def comment_list(request, post_id):
         return Response(serializer.data)
 
     elif request.method == 'POST':
+        if not request.user.has_perm('social_network.add_comment'):
+            logger.warning(f"User {request.user} without 'add_comment' permission attempted to add a comment to post {post_id}.")
+            return Response({"error": "You do not have permission to comment."}, status=status.HTTP_403_FORBIDDEN)
+
         serializer = CommentSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(author=request.user, post=post)
@@ -185,7 +193,13 @@ def register_user(request):
         form = UserCreationForm(request.POST)
         if form.is_valid():
             user = form.save()
-            logger.info(f"User {user.username} registered successfully.")
+            try:
+                user_group = Group.objects.get(name='User')
+                user.groups.add(user_group)
+                logger.info(f"User {user.username} registered successfully and added to 'User' group.")
+            except Group.DoesNotExist:
+                logger.error(f"Default group 'User' not found. User {user.username} was not added to any group.")
+            
             messages.success(request, 'Registration successful. Please log in.')
             return redirect('login_page')
         else:
@@ -223,6 +237,11 @@ def profile_update_view(request):
 
 @login_required
 def post_create(request):
+    if not request.user.has_perm('social_network.add_post'):
+        logger.warning(f"User {request.user.username} without 'add_post' permission attempted to access post_create form.")
+        messages.error(request, 'You do not have permission to create posts.')
+        return redirect('home')
+
     if request.method == 'POST':
         form = PostForm(request.POST, request.FILES)
         if form.is_valid():
@@ -241,6 +260,12 @@ def post_create(request):
 @login_required
 def add_comment(request, pk):
     post = get_object_or_404(Post, pk=pk)
+    
+    if not request.user.has_perm('social_network.add_comment'):
+        logger.warning(f"User {request.user.username} without 'add_comment' permission attempted to access add_comment form for post {pk}.")
+        messages.error(request, 'You do not have permission to add comments.')
+        return redirect('post_detail', pk=post.pk)
+
     if request.method == 'POST':
         form = CommentForm(request.POST)
         if form.is_valid():
@@ -317,6 +342,9 @@ def delete_profile(request):
 @api_view(['POST'])
 @login_required
 def send_friend_request(request, profile_id):
+    if not request.user.has_perm('social_network.add_friendrequest'):
+        logger.warning(f"User {request.user.username} without 'add_friendrequest' permission attempted to send friend request.")
+        return JsonResponse({"message": "You do not have permission to send friend requests."}, status=403)
     try:
         to_user_profile = Profile.objects.get(pk=profile_id)
         from_user_profile = request.user.profile
@@ -354,6 +382,9 @@ def send_friend_request(request, profile_id):
 @api_view(['POST'])
 @login_required
 def accept_friend_request(request, request_id):
+    if not request.user.has_perm('social_network.change_friendrequest'):
+        logger.warning(f"User {request.user.username} without 'change_friendrequest' permission attempted to accept friend request {request_id}.")
+        return JsonResponse({'error': 'You do not have permission to manage friend requests.'}, status=403)
     try:
         logger.info(f"User {request.user.username} is accepting a friend request with ID {request_id}")
         friend_request = FriendRequest.objects.get(pk=request_id, to_user=request.user)
@@ -382,6 +413,9 @@ def accept_friend_request(request, request_id):
 @api_view(['POST'])
 @login_required
 def reject_friend_request(request, request_id):
+    if not request.user.has_perm('social_network.delete_friendrequest'):
+        logger.warning(f"User {request.user.username} without 'delete_friendrequest' permission attempted to reject friend request {request_id}.")
+        return JsonResponse({"message": "You do not have permission to manage friend requests."}, status=403)
     try:
         logger.info(f"User {request.user.username} is rejecting a friend request with ID {request_id}")
         friend_request = FriendRequest.objects.get(id=request_id, to_user=request.user)
@@ -425,6 +459,11 @@ def remove_friend(request, profile_id):
 
 @login_required
 def list_friends(request):
+    if not (request.user.has_perm('social_network.view_profile') or request.user.has_perm('social_network.view_friendrequest')):
+        logger.warning(f"User {request.user.username} without profile/friendrequest view permission tried to list friends.")
+        messages.error(request, "You don't have permission to view this page.")
+        return redirect('home')
+
     profile = request.user.profile
     search_query = request.GET.get('search', '').strip()
     friends = profile.friends.all()
@@ -458,6 +497,11 @@ def list_friends(request):
 
 @login_required
 def search_friends(request):
+    if not (request.user.has_perm('social_network.view_profile') or request.user.has_perm('social_network.view_friendrequest')):
+        logger.warning(f"User {request.user.username} without profile/friendrequest view permission tried to search friends.")
+        messages.error(request, "You don't have permission to use this feature.")
+        return redirect('home')
+
     search_query = request.GET.get('search', '')
 
     logger.info(f"User {request.user.username} started a search for: {search_query}")
@@ -536,9 +580,9 @@ def profile_view(request, username):
 def edit_post(request, post_id):
     post = get_object_or_404(Post, id=post_id)
 
-    if post.author != request.user:
-        logger.warning(f"User {request.user.username} attempted to edit post {post_id} without permission.")
-        messages.error(request, 'You can only edit your own posts.')
+    if not (post.author == request.user or request.user.has_perm('social_network.change_post')):
+        logger.warning(f"User {request.user.username} attempted to edit post {post_id} via HTML form without permission.")
+        messages.error(request, 'You do not have permission to edit this post.')
         return redirect('home')
 
     if request.method == 'POST':
@@ -562,9 +606,9 @@ def edit_post(request, post_id):
 def delete_post(request, post_id):
     post = get_object_or_404(Post, id=post_id)
 
-    if post.author != request.user:
-        logger.warning(f"User {request.user.username} attempted to delete post {post_id} without permission.")
-        messages.error(request, 'You can only delete your own posts.')
+    if not (post.author == request.user or request.user.has_perm('social_network.delete_post')):
+        logger.warning(f"User {request.user.username} attempted to delete post {post_id} via HTML form without permission.")
+        messages.error(request, 'You do not have permission to delete this post.')
         return redirect('home')
 
     if request.method == 'POST':
