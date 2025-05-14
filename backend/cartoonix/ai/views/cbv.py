@@ -9,15 +9,16 @@ from ai.nvidia import generate_video_from_images_with_nvidia
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from django.shortcuts import render
 import base64
 from moviepy import VideoFileClip, concatenate_videoclips
 import uuid
 import os
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
 logger = logging.getLogger('api_logger')
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class GenerateVideo(APIView):
     @swagger_auto_schema(
         operation_summary="Generate video from user prompt",
@@ -119,11 +120,10 @@ class GenerateVideo(APIView):
         }
     )
     def get(self, request):
-        logger.info("GET request to GenerateVideo endpoint.")
         generatedVideos = VideoPrompt.objects.all()
         serializer = VideoPromptSerializer(generatedVideos, many=True)
-        return render(request, 'ai/video_list.html', {'videos': serializer.data})
-
+        return Response(serializer.data)
+        
 
 class VideoDetail(APIView):
     @swagger_auto_schema(
