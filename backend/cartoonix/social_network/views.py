@@ -197,6 +197,20 @@ def friend_list(request):
     serializer = ProfileSerializer(friends, many=True)
     return Response(serializer.data)
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def remove_friend(request, profile_id):
+    other_profile = get_object_or_404(Profile, pk=profile_id)
+    current_profile = request.user.profile
+
+    if other_profile not in current_profile.friends.all():
+        return Response({'error': 'This user is not in your friends list'}, status=status.HTTP_400_BAD_REQUEST)
+
+    current_profile.friends.remove(other_profile)
+    other_profile.friends.remove(current_profile)
+
+    return Response({'message': 'Friend removed successfully'}, status=status.HTTP_200_OK)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

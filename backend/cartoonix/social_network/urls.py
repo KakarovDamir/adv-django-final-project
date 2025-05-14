@@ -7,7 +7,7 @@ from .views import (
     profile_detail, profile_update, profile_delete,
     send_friend_request, accept_friend_request,
     reject_friend_request, friend_list,
-    notification_list, mark_notification_as_read, get_csrf
+    notification_list, mark_notification_as_read, get_csrf, remove_friend
 )
 
 urlpatterns = [
@@ -34,6 +34,7 @@ urlpatterns = [
     path('friends/requests/accept/<int:request_id>/', accept_friend_request, name='accept-friend-request'),
     path('friends/requests/reject/<int:request_id>/', reject_friend_request, name='reject-friend-request'),
     path('friends/list/', friend_list, name='friend-list'),
+    path('friends/remove/<int:profile_id>/', remove_friend, name='remove_friend'),
 
     # Notifications
     path('notifications/', notification_list, name='notification-list'),

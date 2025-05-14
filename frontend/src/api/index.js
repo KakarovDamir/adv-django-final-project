@@ -7,14 +7,14 @@ export default {
     getCurrentUser: () => api.get('auth/user/'),
   },
   posts: {
-    list: () => api.get('posts/'),
-    create: (data) => api.post('posts/', data),
-    like: (postId) => api.post(`posts/${postId}/like/`),
-    comments: {
-      list: (postId) => api.get(`posts/${postId}/comments/`),
-      create: (postId, data) => api.post(`posts/${postId}/comments/`, data),
-    },
+  list: () => api.get('social_network/posts/'),
+  create: (data) => api.post('social_network/posts/', data),
+  like: (postId) => api.post(`social_network/posts/${postId}/like/`),
+  comments: {
+    list: (postId) => api.get(`social_network/posts/${postId}/comments/`),
+    create: (postId, data) => api.post(`social_network/posts/${postId}/comments/`, data),
   },
+},
   profiles: {
     get: (username) => api.get(`profiles/${username}/`),
   },
