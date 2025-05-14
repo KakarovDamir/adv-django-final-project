@@ -69,9 +69,11 @@ export default function FriendList() {
           },
         }
       );
-      setFriends(friends.map(friend => 
-        friend.id === userId ? {...friend, is_friend: true} : friend
-      ));
+      setFriends(
+        friends.map((friend) =>
+          friend.id === userId ? { ...friend, is_friend: true } : friend
+        )
+      );
     } catch (error) {
       console.error("Failed to add friend:", error);
     }
@@ -98,9 +100,12 @@ export default function FriendList() {
               key={friend.id}
               className="flex justify-between items-center p-3 bg-violet-50 rounded-lg border border-violet-100 hover:bg-violet-100 transition-colors"
             >
-              <span className="text-violet-700 font-medium">
+              <a
+                href={`/profile/${friend.username}`}
+                className="text-violet-700 font-medium"
+              >
                 {friend.username}
-              </span>
+              </a>
               {friend.is_friend ? (
                 <button
                   onClick={() => handleRemoveFriend(friend.id)}

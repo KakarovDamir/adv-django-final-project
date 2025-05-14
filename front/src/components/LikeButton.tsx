@@ -1,12 +1,12 @@
-'use client';
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+"use client";
+import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 
 export default function LikeButton({
   postId,
   initialLikes,
   isLiked: initialIsLiked,
-  onLikeUpdate
+  onLikeUpdate,
 }: {
   postId: number;
   initialLikes: number;
@@ -17,7 +17,7 @@ export default function LikeButton({
   const [liked, setLiked] = useState(initialIsLiked);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  // Синхронизация с пропсами
+  // Sync with props
   useEffect(() => {
     setLikes(initialLikes);
     setLiked(initialIsLiked);
@@ -26,27 +26,31 @@ export default function LikeButton({
   const handleLike = async () => {
     const newLikedState = !liked;
     const newLikes = newLikedState ? likes + 1 : likes - 1;
-    
-    // Оптимистичное обновление
+
+    // Optimistic update
     setLiked(newLikedState);
     setLikes(newLikes);
     setIsAnimating(true);
 
     try {
-      const response = await fetch(`http://localhost:8000/social_network/posts/${postId}/like/`, {
-        method: 'POST',
-        headers: {
-          'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '',
-        },
-        credentials: 'include'
-      });
-      
+      const response = await fetch(
+        `http://localhost:8000/social_network/posts/${postId}/like/`,
+        {
+          method: "POST",
+          headers: {
+            "X-CSRFToken":
+              document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "",
+          },
+          credentials: "include",
+        }
+      );
+
       if (!response.ok) {
-        throw new Error('Like failed');
+        throw new Error("Like failed");
       }
       onLikeUpdate(newLikes, newLikedState);
     } catch (err) {
-      // Откат изменений при ошибке
+      // Rollback on error
       setLiked(!newLikedState);
       setLikes(likes);
     } finally {
@@ -55,23 +59,40 @@ export default function LikeButton({
   };
 
   return (
-    <motion.button 
+    <motion.button
       onClick={handleLike}
-      whileTap={{ scale: 0.95 }}
-      className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200 ${
-        liked 
-          ? 'bg-violet-100 text-violet-700 shadow-inner' 
-          : 'text-violet-600 hover:bg-violet-50'
-      }`}
+      whileTap={{ scale: 0.9 }}
+      className="flex items-center text-gray-500 hover:text-red-500 transition-colors"
     >
-      <motion.span
-        key={liked ? 'liked' : 'unliked'}
-        animate={isAnimating ? { scale: 1.2 } : {}}
-        className="text-2xl"
+      <motion.div
+        animate={isAnimating ? { scale: [1, 1.5, 1] } : {}}
+        transition={{ duration: 0.3 }}
+        className="mr-1"
       >
-        {liked ? '❤️' : '🤍'}
-      </motion.span>
-      <span className="font-medium">{likes}</span>
+        {liked ? (
+          <svg
+            viewBox="0 0 24 24"
+            width="20"
+            height="20"
+            fill="rgb(249, 24, 128)"
+            stroke="none"
+          >
+            <path d="M12 21.638h-.014C9.403 21.59 1.95 14.856 1.95 8.478c0-3.064 2.525-5.754 5.403-5.754 2.29 0 3.83 1.58 4.646 2.73.814-1.148 2.354-2.73 4.645-2.73 2.88 0 5.404 2.69 5.404 5.755 0 6.376-7.454 13.11-10.037 13.157H12z" />
+          </svg>
+        ) : (
+          <svg
+            viewBox="0 0 24 24"
+            width="20"
+            height="20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          >
+            <path d="M12 21.638h-.014C9.403 21.59 1.95 14.856 1.95 8.478c0-3.064 2.525-5.754 5.403-5.754 2.29 0 3.83 1.58 4.646 2.73.814-1.148 2.354-2.73 4.645-2.73 2.88 0 5.404 2.69 5.404 5.755 0 6.376-7.454 13.11-10.037 13.157H12z" />
+          </svg>
+        )}
+      </motion.div>
+      <span className={`text-sm ${liked ? "text-red-500" : ""}`}>{likes}</span>
     </motion.button>
   );
 }

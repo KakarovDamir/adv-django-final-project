@@ -1,52 +1,62 @@
-'use client';
-import { useState } from 'react';
+"use client";
+import { useState } from "react";
 
-export default function CommentForm({ 
+export default function CommentForm({
   postId,
   onSubmit,
-  error 
-}: { 
+  error,
+}: {
   postId: number;
   onSubmit: (content: string) => Promise<void>;
   error: string;
 }) {
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
-    
+
     setIsSubmitting(true);
     try {
       await onSubmit(content);
-      setContent('');
+      setContent("");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mt-4">
-      <div className="flex gap-2">
-        <input
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="Write a comment..."
-          className={`flex-1 px-4 py-2 text-violet-900 rounded-lg border ${
-            error ? 'border-red-500' : 'border-violet-100'
-          } focus:ring-2 focus:ring-violet-500 transition-all`}
-          disabled={isSubmitting}
-        />
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
-        >
-          {isSubmitting ? 'Posting...' : 'Post'}
-        </button>
+    <form onSubmit={handleSubmit} className="relative mt-2">
+      <textarea
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        placeholder="Comment here"
+        className={`w-full px-3 py-2 text-gray-800 bg-transparent border ${
+          error ? "border-red-400" : "border-gray-300"
+        } rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-transparent min-h-[60px] resize-none`}
+        disabled={isSubmitting}
+      />
+
+      <div className="flex justify-between items-center mt-2">
+        {error && <p className="text-red-500 text-xs">{error}</p>}
+        <div className="ml-auto flex items-center">
+          <span className="text-xs text-gray-500 mr-2">
+            {content.length}/280
+          </span>
+          <button
+            type="submit"
+            disabled={isSubmitting || content.trim().length < 3}
+            className={`px-4 py-1.5 rounded-full text-white text-sm font-bold transition-colors ${
+              isSubmitting || content.trim().length < 3
+                ? "bg-blue-700 opacity-50 cursor-not-allowed"
+                : "bg-blue-500 hover:bg-blue-600"
+            }`}
+          >
+            {isSubmitting ? "Posting..." : "Comment"}
+          </button>
+        </div>
       </div>
-      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </form>
   );
 }
