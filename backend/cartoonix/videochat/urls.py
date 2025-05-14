@@ -1,7 +1,7 @@
 from django.urls import path
-from videochat import views
+from .views import get_or_create_room, start_call
 
 urlpatterns = [
-    path('<str:room_name>/', views.room, name='room'),
-    path('<str:room_name>/<int:receiver_id>/', views.start_call, name='start_call'),
+    path('room/<slug:room_name>/', get_or_create_room),
+    path('start-call/<slug:room_name>/<int:receiver_id>/', start_call),
 ]
