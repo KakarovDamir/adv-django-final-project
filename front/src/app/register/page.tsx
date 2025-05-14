@@ -24,7 +24,7 @@ export default function RegisterPage() {
 
     try {
       const res = await fetch(
-        "http://localhost:8000/social_network/auth/register/",
+        "http://138.68.87.67:8000/social_network/auth/register/",
         {
           method: "POST",
           headers: {

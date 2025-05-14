@@ -45,10 +45,10 @@ export default function VideoCallPage() {
     // Handle connection based on environment
     if (isNgrok) {
       // If frontend is on ngrok but backend is local, always use localhost for backend
-      wsUrl = "ws://localhost:8000/ws/call/" + roomId + "/";
+      wsUrl = "ws://138.68.87.67:8000/ws/call/" + roomId + "/";
       console.log("🔌 Ngrok frontend detected, connecting to local backend");
     } else if (
-      window.location.hostname === "localhost" ||
+      window.location.hostname === "138.68.87.67" ||
       window.location.hostname === "127.0.0.1"
     ) {
       // For local development
@@ -97,7 +97,7 @@ export default function VideoCallPage() {
       setConnectionStatus("WebSocket connection failed");
 
       // If first attempt fails, try localhost as a fallback
-      const localhostUrl = `ws://localhost:8000/ws/call/${roomId}/`;
+      const localhostUrl = `ws://138.68.87.67:8000/ws/call/${roomId}/`;
       console.log("🔄 Последняя попытка через localhost:", localhostUrl);
       setConnectionStatus("Trying localhost connection...");
 

@@ -39,7 +39,7 @@ export default function PostItem({ post }: { post: any }) {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/social_network/posts/${post.id}/comments/`,
+        `http://138.68.87.67:8000/social_network/posts/${post.id}/comments/`,
         {
           method: "POST",
           headers: {

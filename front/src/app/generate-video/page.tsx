@@ -18,7 +18,7 @@ export default function GenerateVideoPage() {
   useEffect(() => {
     const fetchVideos = async () => {
       try {
-        const response = await fetch('http://localhost:8000/ai/generate/', {
+        const response = await fetch('http://138.68.87.67:8000/ai/generate/', {
           credentials: 'include',
         });
         const data = await response.json();
@@ -36,7 +36,7 @@ export default function GenerateVideoPage() {
     setIsLoading(true);
     
     try {
-      const response = await fetch('http://localhost:8000/ai/generate/', {
+      const response = await fetch('http://138.68.87.67:8000/ai/generate/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

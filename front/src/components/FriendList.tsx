@@ -20,7 +20,7 @@ export default function FriendList() {
   useEffect(() => {
     async function loadFriends() {
       const res = await fetch(
-        `http://localhost:8000/social_network/friends/?search=${searchQuery}`,
+        `http://138.68.87.67:8000/social_network/friends/?search=${searchQuery}`,
         {
           credentials: "include",
           headers: {
@@ -38,7 +38,7 @@ export default function FriendList() {
   const handleRemoveFriend = async (friendId: number) => {
     try {
       await fetch(
-        `http://localhost:8000/social_network/friends/remove/${friendId}/`,
+        `http://138.68.87.67:8000/social_network/friends/remove/${friendId}/`,
         {
           method: "POST",
           credentials: "include",
@@ -58,7 +58,7 @@ export default function FriendList() {
   const handleAddFriend = async (userId: number) => {
     try {
       await fetch(
-        `http://localhost:8000/social_network/friends/requests/send/${userId}/`,
+        `http://138.68.87.67:8000/social_network/friends/requests/send/${userId}/`,
         {
           method: "POST",
           credentials: "include",

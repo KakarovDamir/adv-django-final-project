@@ -27,7 +27,7 @@ export default function UpdateProfilePage() {
     const loadProfile = async () => {
       try {
         const response = await fetch(
-          "http://localhost:8000/social_network/profile/update/",
+          "http://138.68.87.67:8000/social_network/profile/update/",
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -68,7 +68,7 @@ export default function UpdateProfilePage() {
 
     try {
       const response = await fetch(
-        "http://localhost:8000/social_network/profile/update/",
+        "http://138.68.87.67:8000/social_network/profile/update/",
         {
           method: "PUT",
           headers: {

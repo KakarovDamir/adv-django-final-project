@@ -8,7 +8,7 @@ export default function EditPostPage() {
   const [post, setPost] = useState<any>(null);
 
   useEffect(() => {
-    fetch(`http://localhost:8000/social_network/posts/${id}/`)
+    fetch(`http://138.68.87.67:8000/social_network/posts/${id}/`)
       .then(res => res.json())
       .then(setPost);
   }, [id]);
@@ -17,7 +17,7 @@ export default function EditPostPage() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget as HTMLFormElement);
     
-    const res = await fetch(`http://localhost:8000/social_network/posts/${id}/update/`, {
+    const res = await fetch(`http://138.68.87.67:8000/social_network/posts/${id}/update/`, {
       method: 'PUT',
       headers: { 
         'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '',
@@ -31,14 +31,14 @@ export default function EditPostPage() {
       credentials: 'include'
     });
 
-    if (res.ok) router.push(`http://localhost:3000/home`);
+    if (res.ok) router.push(`http://138.68.87.67:3000/home`);
   };
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this post?')) return;
     
     try {
-      const res = await fetch(`http://localhost:8000/social_network/posts/${id}/delete/`, {
+      const res = await fetch(`http://138.68.87.67:8000/social_network/posts/${id}/delete/`, {
         method: 'DELETE',
         headers: {
           'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '',
@@ -47,7 +47,7 @@ export default function EditPostPage() {
       });
 
       if (res.ok) {
-        router.push('http://localhost:3000/home');
+        router.push('http://138.68.87.67:3000/home');
       } else {
         alert('Failed to delete post');
       }

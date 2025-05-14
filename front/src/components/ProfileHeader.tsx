@@ -54,13 +54,13 @@ export default function ProfileHeader({ username }: { username: string }) {
     const loadData = async () => {
       try {
         const [profileRes, userRes] = await Promise.all([
-          fetch(`http://localhost:8000/social_network/profile/${username}`, {
+          fetch(`http://138.68.87.67:8000/social_network/profile/${username}`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
             credentials: 'include'
           }),
-          fetch('http://localhost:8000/social_network/auth/current_user/', {
+          fetch('http://138.68.87.67:8000/social_network/auth/current_user/', {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
@@ -95,7 +95,7 @@ export default function ProfileHeader({ username }: { username: string }) {
   const deleteProfile = async () => {
     if (confirm('Are you sure?')) {
       try {
-        const response = await fetch('http://localhost:8000/social_network/api/profile/delete/', {
+        const response = await fetch('http://138.68.87.67:8000/social_network/api/profile/delete/', {
           method: 'DELETE',
           headers: {
             'X-CSRFToken': getCookie('csrftoken') || '',
@@ -113,7 +113,7 @@ export default function ProfileHeader({ username }: { username: string }) {
   const handleFriendRequest = async () => {
     try {
       await fetch(
-        `http://localhost:8000/social_network/friends/requests/send/${profile?.user.id}/`,
+        `http://138.68.87.67:8000/social_network/friends/requests/send/${profile?.user.id}/`,
         {
           method: "POST",
           credentials: "include",

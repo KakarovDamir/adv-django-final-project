@@ -34,7 +34,7 @@ export default function ProfilePage({
   const fetchProfile = async () => {
     try {
       const response = await fetch(
-        `http://localhost:8000/social_network/profile/${username}`,
+        `http://138.68.87.67:8000/social_network/profile/${username}`,
         {
           headers: {
             "Content-Type": "application/json",
@@ -92,12 +92,12 @@ export default function ProfilePage({
       let method: "POST" | "DELETE" = "POST";
 
       if (profile?.friendship_status === "friends") {
-        url = `http://localhost:8000/social_network/friends/remove/${profile.id}/`;
+        url = `http://138.68.87.67:8000/social_network/friends/remove/${profile.id}/`;
       } else if (profile?.friendship_status === "request_sent") {
-        url = `http://localhost:8000/social_network/friends/requests/cancel/${profile.id}/`;
+        url = `http://138.68.87.67:8000/social_network/friends/requests/cancel/${profile.id}/`;
         method = "DELETE";
       } else {
-        url = `http://localhost:8000/social_network/friends/requests/send/${profile?.id}/`;
+        url = `http://138.68.87.67:8000/social_network/friends/requests/send/${profile?.id}/`;
       }
 
       const csrfToken = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "";

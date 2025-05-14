@@ -34,7 +34,7 @@ export default function LikeButton({
 
     try {
       const response = await fetch(
-        `http://localhost:8000/social_network/posts/${postId}/like/`,
+        `http://138.68.87.67:8000/social_network/posts/${postId}/like/`,
         {
           method: "POST",
           headers: {

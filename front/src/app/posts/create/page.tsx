@@ -4,7 +4,7 @@ import { useActionState } from "react";
 
 async function createPost(prevState: any, formData: FormData) {
   try {
-    const res = await fetch("http://localhost:8000/social_network/posts/", {
+    const res = await fetch("http://138.68.87.67:8000/social_network/posts/", {
       method: "POST",
       headers: {
         "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "",

@@ -30,7 +30,7 @@ export default function FriendRequests({ onUpdate }: FriendRequestsProps) {
   });
 
   useEffect(() => {
-    fetch("http://localhost:8000/social_network/friends/requests/", {
+    fetch("http://138.68.87.67:8000/social_network/friends/requests/", {
       credentials: "include",
       headers: {
         "Authorization": `Bearer ${localStorage.getItem('token')}`
@@ -45,7 +45,7 @@ export default function FriendRequests({ onUpdate }: FriendRequestsProps) {
 
   const handleRequest = async (id: number, action: "accept" | "reject") => {
     await fetch(
-      `http://localhost:8000/social_network/friends/requests/${action}/${id}/`,
+      `http://138.68.87.67:8000/social_network/friends/requests/${action}/${id}/`,
       {
         method: "POST",
         headers: {

@@ -15,7 +15,7 @@ export default function LoginPage() {
 
     try {
       const res = await fetch(
-        "http://localhost:8000/social_network/auth/login/",
+        "http://138.68.87.67:8000/social_network/auth/login/",
         {
           method: "POST",
           headers: {

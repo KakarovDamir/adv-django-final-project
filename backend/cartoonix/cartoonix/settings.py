@@ -36,7 +36,7 @@ SECRET_KEY = 'django-insecure-x^i)oq3eg3#c2cixzi3_17r8(^e&m607ck^serj&z8h$5#+p-y
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '*', '192.168.65.1:29336', '2a20-5-251-210-196.ngrok-free.app', '192.168.65.1:53028', '.ngrok-free.app', '.ngrok.io']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '*', '192.168.65.1:29336', '138.68.87.67:3000']
 
 
 INSTALLED_APPS = [
@@ -233,6 +233,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR.parent, 'static')
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
@@ -280,20 +281,17 @@ CORS_ORIGIN_ALLOW_ALL = True  # Allow connections from any origin
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    "https://2a20-5-251-210-196.ngrok-free.app",
     "http://frontend:3000",  # Add Docker container hostname
     "http://localhost:8000",
     "http://backend:8000",
+    "http://138.68.87.67:3000",
 ]
 CORS_TRUSTED_ORIGINS = [
     "http://localhost:3000",
-    "https://2a20-5-251-210-196.ngrok-free.app",
     "http://frontend:3000",  # Add Docker container hostname
     "http://localhost:8000",
     "http://backend:8000",
-    "https://*.ngrok-free.app",  # Allow any ngrok subdomain
-    "https://*.ngrok.io",
-    "http://*.ngrok.io",
+    "http://138.68.87.67:3000",
 ]
 SESSION_COOKIE_SAMESITE = 'None'  # Allow cross-site cookies
 SESSION_COOKIE_SECURE = True  # Cookies only sent over HTTPS

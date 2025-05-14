@@ -21,7 +21,7 @@ export default function PostList() {
     setLoading(true);
     try {
       const res = await csrfFetch(
-        `http://localhost:8000/social_network/posts/?page=${page}`
+        `http://138.68.87.67:8000/social_network/posts/?page=${page}`
       );
 
       if (!res.ok) {

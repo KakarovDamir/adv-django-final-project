@@ -13,7 +13,7 @@ export default function UserPosts({ username }: { username: string }) {
     try {
       console.log('Fetching posts for username:', username);
       
-      const res = await csrfFetch(`http://localhost:8000/social_network/users/${encodeURIComponent(username)}/posts/`);
+      const res = await csrfFetch(`http://138.68.87.67:8000/social_network/users/${encodeURIComponent(username)}/posts/`);
       
       console.log('Posts API response:', res.status);
       
