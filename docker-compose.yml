@@ -105,6 +105,8 @@ services:
       - DB_PASSWORD=postgres
       - DB_HOST=db
       - DB_PORT=5432
+      - DB_REPLICA_HOST=db_replica
+      - DB_REPLICA_PORT=5432
       - REDIS_URL=redis://redis:6379/0
       - PYTHONPATH=/app:/app/cartoonix
       - DJANGO_SETTINGS_MODULE=cartoonix.settings
