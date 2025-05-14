@@ -4,11 +4,16 @@ import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import Peer from "simple-peer";
 
+// Add a type for custom WebSocket with _mySelfId property
+interface CustomWebSocket extends WebSocket {
+  _mySelfId?: string;
+}
+
 export default function VideoCallPage() {
   const params = useParams();
   const roomId = typeof params.roomId === "string" ? params.roomId : "";
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const socketRef = useRef<WebSocket | null>(null);
+  const socketRef = useRef<CustomWebSocket | null>(null);
   const userVideo = useRef<HTMLVideoElement | null>(null);
   const partnerVideo = useRef<HTMLVideoElement | null>(null);
   const peerRef = useRef<Peer.Instance | null>(null);
@@ -17,24 +22,27 @@ export default function VideoCallPage() {
 
   // 1. Получаем камеру один раз
   useEffect(() => {
-    navigator.mediaDevices
-      .getUserMedia({ video: true, audio: true })
-      .then((localStream) => {
-        console.log("🎥 Камера получена");
-        setStream(localStream);
-        if (userVideo.current && !userVideo.current.srcObject) {
-          userVideo.current.srcObject = localStream;
-        }
-      })
-      .catch((err) => {
-        console.error("🚫 Ошибка доступа к камере:", err);
-        alert("Ошибка доступа к камере.");
-      });
+    // Check if we're in the browser environment
+    if (typeof window !== "undefined" && navigator.mediaDevices) {
+      navigator.mediaDevices
+        .getUserMedia({ video: true, audio: true })
+        .then((localStream) => {
+          console.log("🎥 Камера получена");
+          setStream(localStream);
+          if (userVideo.current && !userVideo.current.srcObject) {
+            userVideo.current.srcObject = localStream;
+          }
+        })
+        .catch((err) => {
+          console.error("🚫 Ошибка доступа к камере:", err);
+          alert("Ошибка доступа к камере.");
+        });
+    }
   }, []);
 
   // 2. Подключаем WebSocket и Peer когда stream готов
   useEffect(() => {
-    if (!roomId || !stream) return;
+    if (!roomId || !stream || typeof window === "undefined") return;
 
     // Determine WebSocket connection options
     let wsUrl = "";
@@ -68,7 +76,7 @@ export default function VideoCallPage() {
     setConnectionStatus("Connecting to WebSocket...");
 
     // Create the WebSocket connection
-    socketRef.current = new WebSocket(wsUrl);
+    socketRef.current = new WebSocket(wsUrl) as CustomWebSocket;
 
     socketRef.current.onopen = () => {
       console.log("✅ WebSocket подключен");
@@ -106,7 +114,7 @@ export default function VideoCallPage() {
         socketRef.current.close();
       }
 
-      socketRef.current = new WebSocket(localhostUrl);
+      socketRef.current = new WebSocket(localhostUrl) as CustomWebSocket;
 
       socketRef.current.onopen = () => {
         console.log("✅ Localhost WebSocket подключен");
@@ -154,7 +162,7 @@ export default function VideoCallPage() {
           }
 
           // Save my user ID if it's in the room
-          const myUserId = signal.users.find((id) =>
+          const myUserId = signal.users.find((id: string) =>
             id.includes(socketRef.current?._mySelfId || "unknown")
           );
 
@@ -164,7 +172,8 @@ export default function VideoCallPage() {
 
           // Get other users (not me)
           const otherUsers = signal.users.filter(
-            (id) => !id.includes(socketRef.current?._mySelfId || "unknown")
+            (id: string) =>
+              !id.includes(socketRef.current?._mySelfId || "unknown")
           );
 
           console.log(
@@ -214,7 +223,7 @@ export default function VideoCallPage() {
               },
             });
 
-            peer.on("signal", (signalData) => {
+            peer.on("signal", (signalData: any) => {
               console.log("📤 Отправляем ответ на offer");
               if (socketRef.current?.readyState === WebSocket.OPEN) {
                 socketRef.current.send(
@@ -223,7 +232,7 @@ export default function VideoCallPage() {
               }
             });
 
-            peer.on("stream", (remoteStream) => {
+            peer.on("stream", (remoteStream: MediaStream) => {
               console.log(
                 "📺 Получен remoteStream от peer с ID:",
                 remoteStream.id
@@ -231,12 +240,12 @@ export default function VideoCallPage() {
               handleRemoteStream(remoteStream);
             });
 
-            peer.on("track", (track, stream) => {
+            peer.on("track", (track: MediaStreamTrack, stream: MediaStream) => {
               console.log("🎮 Получен track:", track.kind);
               handleRemoteStream(stream);
             });
 
-            peer.on("error", (err) => {
+            peer.on("error", (err: Error) => {
               console.error("❌ Peer ошибка (answerer):", err);
             });
 
@@ -284,7 +293,7 @@ export default function VideoCallPage() {
     };
 
     // Helper function to initialize a peer connection
-    const initializePeerConnection = (isInitiator) => {
+    const initializePeerConnection = (isInitiator: boolean) => {
       try {
         console.log(`🔄 Создаем peer connection (initiator: ${isInitiator})`);
 
@@ -311,24 +320,24 @@ export default function VideoCallPage() {
               { urls: "stun:stun.stunprotocol.org:3478" },
             ],
           },
-          sdpTransform: (sdp) => {
+          sdpTransform: (sdp: string) => {
             console.log("🔄 Transforming SDP to ensure compatibility");
             // Ensure video codec compatibility by prioritizing common codecs
             return sdp;
           },
         });
 
-        peer.on("stream", (remoteStream) => {
+        peer.on("stream", (remoteStream: MediaStream) => {
           console.log("📺 Получен remoteStream с ID:", remoteStream.id);
           handleRemoteStream(remoteStream);
         });
 
-        peer.on("track", (track, stream) => {
+        peer.on("track", (track: MediaStreamTrack, stream: MediaStream) => {
           console.log("🎮 Получен track:", track.kind);
           handleRemoteStream(stream);
         });
 
-        peer.on("signal", (signal) => {
+        peer.on("signal", (signal: any) => {
           console.log(
             `📤 Отправляем ${isInitiator ? "offer" : "answer"} signal`
           );
@@ -344,7 +353,7 @@ export default function VideoCallPage() {
           }
         });
 
-        peer.on("error", (err) => {
+        peer.on("error", (err: Error) => {
           console.error(
             `❌ Peer ошибка (${isInitiator ? "offerer" : "answerer"}):`,
             err
@@ -384,7 +393,7 @@ export default function VideoCallPage() {
     };
 
     // Helper function to handle remote stream connection
-    const handleRemoteStream = (remoteStream) => {
+    const handleRemoteStream = (remoteStream: MediaStream) => {
       if (!remoteStream) {
         console.error("❌ Received empty remote stream");
         return;
@@ -410,7 +419,7 @@ export default function VideoCallPage() {
           if (videoTracks.length === 0) {
             console.warn("⚠️ No video tracks in remote stream!");
           } else {
-            videoTracks.forEach((track) =>
+            videoTracks.forEach((track: MediaStreamTrack) =>
               console.log(
                 `📹 Video track: ${track.label}, enabled: ${track.enabled}, readyState: ${track.readyState}`
               )
