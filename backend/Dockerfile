@@ -58,4 +58,6 @@ USER appuser
 # Expose port
 EXPOSE 8000
 
+CMD ["python", "cartoonix/manage.py", "migrate", "&&", "daphne", "-b", "0.0.0.0", "-p", "8000", "cartoonix.asgi:application"]
+
 # Command will be specified in docker-compose.yml
