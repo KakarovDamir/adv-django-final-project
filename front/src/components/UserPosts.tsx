@@ -11,14 +11,21 @@ export default function UserPosts({ username }: { username: string }) {
 
   const loadPosts = async () => {
     try {
-      const res = await csrfFetch(`http://localhost:8000/social_network/posts/?author=${username}`);
+      console.log('Fetching posts for username:', username);
+      
+      const res = await csrfFetch(`http://localhost:8000/social_network/users/${encodeURIComponent(username)}/posts/`);
+      
+      console.log('Posts API response:', res.status);
       
       if (!res.ok) {
         const error = await res.json();
+        console.error('API Error:', error);
         throw new Error(error.message || 'Failed to load posts');
       }
       
-      setPosts(await res.json());
+      const data = await res.json();
+      console.log('Received posts:', data);
+      setPosts(data);
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : 'Unknown error');

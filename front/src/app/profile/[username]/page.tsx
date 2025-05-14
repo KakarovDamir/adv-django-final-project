@@ -1,9 +1,7 @@
 'use client';
-import ProfileHeader from '../../../components/ProfileHeader';
 import UserPosts from '../../../components/UserPosts';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import { useState, useEffect, use } from 'react';
-import StatsCard from '../../../components/StatsCard';
 import ErrorMessage from '../../../components/ErrorMessage';
 
 interface ProfileData {
@@ -16,11 +14,17 @@ interface ProfileData {
   is_friend: boolean;
 }
 
+interface User {
+  username: string;
+  // Добавьте другие поля если необходимо
+}
+
 export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   const fetchProfile = async () => {
     try {
@@ -56,7 +60,24 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   };
 
   useEffect(() => {
-    fetchProfile();
+    const loadData = async () => {
+      await fetchProfile();
+      // Получаем текущего пользователя из localStorage
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        try {
+          const parsedUser = JSON.parse(userData);
+          setCurrentUser({
+            username: parsedUser.username,
+            // Добавьте другие поля при необходимости
+          });
+        } catch (err) {
+          console.error('Error parsing user data:', err);
+        }
+      }
+    };
+
+    loadData();
   }, [username]);
 
   if (isLoading) {
@@ -110,30 +131,30 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
           <div className="flex-1">
             <div className="flex items-center gap-4 mb-4">
-              <h1 className="text-2xl font-light">{profile?.username}</h1>
-              {profile?.is_friend ? (
-                <button className="px-4 py-1 bg-gray-100 rounded-md text-sm font-medium">
-                  Friends
-                </button>
-              ) : (
-                <button className="px-4 py-1 bg-blue-500 text-white rounded-md text-sm font-medium">
-                  Follow
-                </button>
+              <h1 className="text-2xl font-light text-black">{profile?.username}</h1>
+              {currentUser && currentUser.username !== username && (
+                <>
+                  {profile?.is_friend ? (
+                    <button className="px-4 py-1 bg-gray-100 rounded-md text-sm font-medium">
+                      Friends
+                    </button>
+                  ) : (
+                    <button className="px-4 py-1 bg-blue-500 text-white rounded-md text-sm font-medium">
+                      Follow
+                    </button>
+                  )}
+                </>
               )}
             </div>
 
             <div className="flex gap-8 mb-4">
               <div className="text-center">
-                <span className="font-semibold">{profile?.posts_count}</span>
+                <span className="font-semibold text-black">{profile?.posts_count}</span>
                 <span className="block text-gray-600 text-sm">posts</span>
               </div>
               <div className="text-center">
-                <span className="font-semibold">{profile?.friends_count}</span>
+                <span className="font-semibold text-black">{profile?.friends_count}</span>
                 <span className="block text-gray-600 text-sm">followers</span>
-              </div>
-              <div className="text-center">
-                <span className="font-semibold">0</span>
-                <span className="block text-gray-600 text-sm">following</span>
               </div>
             </div>
 
@@ -142,10 +163,8 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         </div>
 
         {/* Posts Grid */}
-        <div className="grid grid-cols-3 gap-2">
-          {Array.from({ length: profile?.posts_count || 0 }).map((_, i) => (
-            <div key={i} className="aspect-square bg-gray-100 animate-pulse"></div>
-          ))}
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <UserPosts username={username} />
         </div>
       </div>
     </div>

@@ -144,15 +144,15 @@ class ProfileSerializer(serializers.ModelSerializer):
     friends_count = serializers.SerializerMethodField()
     posts_count = serializers.SerializerMethodField()
     is_friend = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
     id = serializers.IntegerField(source='user.id', read_only=True)
 
     class Meta:
         model = Profile
         fields = [
-            'id',
-            'username', 'email', 'first_name', 'last_name',
+            'id', 'username', 'email', 'first_name', 'last_name',
             'bio', 'avatar', 'birth_date', 'friends_count',
-            'posts_count', 'is_friend'
+            'posts_count', 'is_friend', 'is_owner'
         ]
         read_only_fields = ['id', 'username', 'email', 'friends_count', 'posts_count', 'is_friend']
 
@@ -167,6 +167,10 @@ class ProfileSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             return obj in request.user.profile.friends.all()
         return False
+
+    def get_is_owner(self, obj):
+        request = self.context.get('request')
+        return request and request.user == obj.user
 
 class ProfileUpdateSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(source='user.first_name', required=False)

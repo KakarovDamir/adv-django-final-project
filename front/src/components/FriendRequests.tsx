@@ -19,7 +19,11 @@ interface FriendRequestsResponse {
   sent: FriendRequest[];
 }
 
-export default function FriendRequests() {
+interface FriendRequestsProps {
+  onUpdate: (count: number) => void;
+}
+
+export default function FriendRequests({ onUpdate }: FriendRequestsProps) {
   const [requests, setRequests] = useState<FriendRequestsResponse>({
     received: [],
     sent: [],
@@ -29,12 +33,15 @@ export default function FriendRequests() {
     fetch("http://localhost:8000/social_network/friends/requests/", {
       credentials: "include",
       headers: {
-        "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "",
+        "Authorization": `Bearer ${localStorage.getItem('token')}`
       },
     })
       .then((res) => res.json())
-      .then(setRequests);
-  }, []);
+      .then(data => {
+        setRequests(data);
+        onUpdate(data.received.length);
+      });
+  }, [onUpdate]);
 
   const handleRequest = async (id: number, action: "accept" | "reject") => {
     await fetch(

@@ -32,17 +32,10 @@ export default function RootLayout({
   const [username, setUsername] = useState('');
 
   useEffect(() => {
-    // Безопасное получение данных
-    try {
-      const userJson = localStorage.getItem('user');
-      if (userJson) {
-        const user = JSON.parse(userJson);
-        if (user?.username) {
-          setUsername(user.username);
-        }
-      }
-    } catch (e) {
-      console.error('Error parsing user data:', e);
+    const user = localStorage.getItem('user');
+    if (user) {
+      const parsedUser = JSON.parse(user);
+      setUsername(parsedUser.username);
     }
   }, []);
 

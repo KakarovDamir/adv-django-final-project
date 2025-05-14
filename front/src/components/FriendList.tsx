@@ -55,6 +55,28 @@ export default function FriendList() {
     }
   };
 
+  const handleAddFriend = async (profileId: number) => {
+    try {
+      await fetch(
+        `http://localhost:8000/social_network/friends/requests/send/${profileId}/`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "X-CSRFToken":
+              document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "",
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      setFriends(friends.map(friend => 
+        friend.id === profileId ? {...friend, is_friend: true} : friend
+      ));
+    } catch (error) {
+      console.error("Failed to add friend:", error);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <input
@@ -79,12 +101,21 @@ export default function FriendList() {
               <span className="text-violet-700 font-medium">
                 {friend.username}
               </span>
-              <button
-                onClick={() => handleRemoveFriend(friend.id)}
-                className="text-red-600 hover:text-red-700 px-3 py-1 rounded-md transition-colors"
-              >
-                Remove
-              </button>
+              {friend.is_friend ? (
+                <button
+                  onClick={() => handleRemoveFriend(friend.id)}
+                  className="text-red-600 hover:text-red-700 px-3 py-1 rounded-md transition-colors"
+                >
+                  Remove
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleAddFriend(friend.id)}
+                  className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-1 rounded-md transition-colors"
+                >
+                  Add Friend
+                </button>
+              )}
             </div>
           ))
         )}

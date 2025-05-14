@@ -7,7 +7,8 @@ from .views import (accept_friend_request, api_login, api_logout, api_register,
                     notification_list, post_delete, post_detail, post_like,
                     post_list_create, post_update, profile_delete,
                     profile_detail, profile_update, reject_friend_request,
-                    remove_friend, search_users, send_friend_request)
+                    remove_friend, search_users, send_friend_request,
+                    user_friends, user_posts)
 
 urlpatterns = [
     # Auth
@@ -45,4 +46,8 @@ urlpatterns = [
 
     # Likes
     path('posts/<int:post_id>/like/', post_like, name='post-like'),
+
+    # User specific
+    path('users/<str:username>/posts/', user_posts, name='user-posts'),
+    path('users/<str:username>/friends/', user_friends, name='user-friends'),
 ]

@@ -16,7 +16,7 @@ from .serializers import (CommentSerializer, FriendRequestSerializer,
                           NotificationSerializer, PostSerializer,
                           ProfileSerializer, ProfileUpdateSerializer,
                           RegisterSerializer, UserSerializer)
-
+from django.contrib.auth.models import User
 
 @ensure_csrf_cookie
 def get_csrf(request):
@@ -363,3 +363,18 @@ def search_users(request):
     return Response({'users': serializer.data})
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_posts(request, username):
+    user = get_object_or_404(User, username=username)
+    posts = Post.objects.filter(author=user).order_by('-created_at')
+    serializer = PostSerializer(posts, many=True, context={'request': request})
+    return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_friends(request, username):
+    user = get_object_or_404(User, username=username)
+    friends = user.profile.friends.all()
+    serializer = ProfileSerializer(friends, many=True, context={'request': request})
+    return Response(serializer.data)
