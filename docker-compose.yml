@@ -11,18 +11,22 @@ services:
       - backend_static:/app/static
       - backend_media:/app/media
       - backend_logs:/app/cartoonix/logs
+      - backend_data:/app/cartoonix/data
+    env_file:
+      - .env
     environment:
       - DEBUG=True
       - DATABASE_URL=postgres://postgres:postgres@db:5432/cartoonix
       - REDIS_URL=redis://redis:6379/0
       - PYTHONPATH=/app:/app/cartoonix
       - DJANGO_SETTINGS_MODULE=cartoonix.settings
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ALLOWED_HOSTS=localhost,127.0.0.1,138.68.87.67
     ports:
       - "8000:8000"
     depends_on:
       - db
       - redis
-    # Use direct path to the manage.py script
     command: python /app/cartoonix/manage.py runserver 0.0.0.0:8000
     deploy:
       resources:
@@ -44,6 +48,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - PYTHONPATH=/app:/app/cartoonix
       - DJANGO_SETTINGS_MODULE=cartoonix.settings
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - backend
       - db
@@ -63,17 +68,20 @@ services:
     volumes:
       - ./backend:/app
       - backend_logs:/app/cartoonix/logs
+      - celery_beat_data:/app/celerybeat
     environment:
       - DEBUG=True
       - DATABASE_URL=postgres://postgres:postgres@db:5432/cartoonix
       - REDIS_URL=redis://redis:6379/0
       - PYTHONPATH=/app:/app/cartoonix
       - DJANGO_SETTINGS_MODULE=cartoonix.settings
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - backend
       - db
       - redis
-    command: sh -c "cd /app && celery -A cartoonix beat -l info"
+    user: root
+    command: sh -c "mkdir -p /app/celerybeat && chown -R nobody:nogroup /app/celerybeat && chmod -R 777 /app/celerybeat && cd /app && celery -A cartoonix beat -l info --schedule=/app/celerybeat/celerybeat-schedule"
     deploy:
       resources:
         limits:
@@ -83,10 +91,10 @@ services:
   # Frontend service (React)
   frontend:
     build:
-      context: ./frontend
+      context: ./front
       dockerfile: Dockerfile
     volumes:
-      - ./frontend:/app
+      - ./front:/app
       - /app/node_modules
     ports:
       - "3000:3000"
@@ -94,7 +102,7 @@ services:
       - REACT_APP_API_URL=http://localhost:8000/api
     depends_on:
       - backend
-    command: npm start
+    command: npm run dev
     deploy:
       resources:
         limits:
@@ -137,3 +145,5 @@ volumes:
   backend_static:
   backend_media:
   backend_logs:
+  backend_data:
+  celery_beat_data:
