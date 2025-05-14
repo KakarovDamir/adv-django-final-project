@@ -7,13 +7,15 @@ import base64
 import io
 
 import matplotlib.pyplot as plt
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models import Avg, Count
 from django.shortcuts import render
 from social_network.models import Post
 
 logger = logging.getLogger('dashboard_logger')
 
+def can_view_analytics_dashboard(user):
+    return user.groups.filter(name='Analytics_Viewer').exists()
 
 def generate_bar_chart(chart_data):
     try:
@@ -64,6 +66,7 @@ def generate_pie_chart(pie_data):
         return None
 
 @login_required
+@user_passes_test(can_view_analytics_dashboard)
 def dashboard(request):
     user = request.user
     logger.info(f"Dashboard accessed by user {user.username}.")

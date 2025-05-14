@@ -3,6 +3,7 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
+from django.views.decorators.cache import cache_page
 from rest_framework import status
 from rest_framework.authentication import (SessionAuthentication,
                                            TokenAuthentication)
@@ -11,12 +12,13 @@ from rest_framework.decorators import (api_view, authentication_classes,
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from .models import FriendRequest, Notification, Post, Profile
+from .models import Comment, FriendRequest, Notification, Post, Profile
 from .serializers import (CommentSerializer, FriendRequestSerializer,
                           NotificationSerializer, PostSerializer,
                           ProfileSerializer, ProfileUpdateSerializer,
                           RegisterSerializer, UserSerializer)
 from django.contrib.auth.models import User
+from .permissions import CanEditOrDeletePost, CanManageComment
 
 @ensure_csrf_cookie
 def get_csrf(request):
@@ -66,6 +68,7 @@ def api_register(request):
     }, status=status.HTTP_400_BAD_REQUEST)
 
 
+@cache_page(60 * 2)
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def post_list_create(request):
@@ -83,8 +86,9 @@ def post_list_create(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@cache_page(60 * 2)
 @api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, CanEditOrDeletePost])
 def post_detail(request, pk):
     try:
         post = Post.objects.get(pk=pk)
@@ -96,22 +100,18 @@ def post_detail(request, pk):
         return Response(serializer.data)
 
     elif request.method == 'PUT':
-        if post.author != request.user:
-            return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
-
-        serializer = PostSerializer(post, data=request.data)
+        serializer = PostSerializer(post, data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
-        if post.author != request.user:
-            return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
         post.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@cache_page(60 * 1)
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def comment_list_create(request, post_id):
@@ -134,6 +134,7 @@ def comment_list_create(request, post_id):
 
 
 
+@cache_page(60 * 5)
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([AllowAny])
@@ -240,6 +241,7 @@ def reject_friend_request(request, request_id):
     return Response({'message': 'Friend request rejected'})
 
 
+@cache_page(60 * 5)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def friend_list(request):
@@ -266,6 +268,7 @@ def friend_list(request):
         return Response({'users': serializer.data})
 
 
+@cache_page(30)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def notification_list(request):
@@ -297,11 +300,9 @@ def post_like(request, post_id):
         return Response({'liked': True, 'count': post.total_likes()})
 
 @api_view(['PUT', 'PATCH'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, CanEditOrDeletePost])
 def post_update(request, pk):
     post = get_object_or_404(Post, pk=pk)
-    if post.author != request.user:
-        return Response({"error": "You are not the author"}, status=403)
     
     serializer = PostSerializer(
         post, 
@@ -313,17 +314,15 @@ def post_update(request, pk):
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data)
-    return Response(serializer.errors, status=400)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, CanEditOrDeletePost])
 def post_delete(request, pk):
     post = get_object_or_404(Post, pk=pk)
-    if post.author != request.user:
-        return Response({"error": "You are not the author"}, status=403)
     
     post.delete()
-    return Response(status=204)
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])
@@ -332,6 +331,7 @@ def current_user(request):
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
 
+@cache_page(30)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def friend_request_list(request):
@@ -347,6 +347,7 @@ def friend_request_list(request):
         'sent': sent_serializer.data
     })
 
+@cache_page(60 * 1)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def search_users(request):
@@ -364,6 +365,7 @@ def search_users(request):
     return Response({'users': serializer.data})
 
 
+@cache_page(60 * 2)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def user_posts(request, username):
@@ -372,6 +374,7 @@ def user_posts(request, username):
     serializer = PostSerializer(posts, many=True, context={'request': request})
     return Response(serializer.data)
 
+@cache_page(60 * 5)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def user_friends(request, username):

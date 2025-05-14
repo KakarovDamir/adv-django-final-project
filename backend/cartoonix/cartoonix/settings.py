@@ -104,8 +104,37 @@ DATABASES = {
         'PASSWORD': os.environ.get('DB_PASSWORD'),
         'HOST': os.environ.get('DB_HOST'),
         'PORT': os.environ.get('DB_PORT', '5432'),
+    },
+    'read_replica': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('DB_NAME'), 
+        'USER': os.environ.get('DB_USER'), 
+        'PASSWORD': os.environ.get('DB_PASSWORD'),
+        'HOST': os.environ.get('DB_REPLICA_HOST'), 
+        'PORT': os.environ.get('DB_REPLICA_PORT', '5432'),
+        'TEST': {
+            'MIRROR': 'default', 
+        },
     }
 }
+
+class ReadReplicaRouter:
+    def db_for_read(self, model, **hints):
+        return 'read_replica'
+
+    def db_for_write(self, model, **hints):
+        return 'default'
+
+    def allow_relation(self, obj1, obj2, **hints):
+        db_list = ('default', 'read_replica')
+        if obj1._state.db in db_list and obj2._state.db in db_list:
+            return True
+        return None
+
+    def allow_migrate(self, db, app_label, model_name=None, **hints):
+        return db == 'default'
+
+DATABASE_ROUTERS = ['cartoonix.settings.ReadReplicaRouter']
 
 
 # Password validation
@@ -125,6 +154,17 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
+# Cache settings
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"redis://{os.environ.get('REDIS_HOST', 'redis')}:{os.environ.get('REDIS_PORT', '6379')}/1", # DB 1 for cache
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
 
 LOGGING = {
     'version': 1,

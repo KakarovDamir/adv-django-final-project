@@ -8,6 +8,8 @@ from ai.models import VideoPrompt
 from django import forms
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
+from django.contrib.postgres.search import SearchVector
+from django.contrib.postgres.indexes import GinIndex, BrinIndex
 
 logger = logging.getLogger('model_logger')
 
@@ -18,6 +20,11 @@ class Profile(models.Model):
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
     birth_date = models.DateField(null=True, blank=True)
     friends = models.ManyToManyField('self', symmetrical=True, blank=True)
+
+    class Meta:
+        indexes = [
+            GinIndex(SearchVector('bio', config='pg_catalog.russian'), name='profile_bio_search_idx'),
+        ]
 
     def __str__(self):
         return self.user.username
@@ -43,6 +50,15 @@ class Post(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     likes = models.ManyToManyField(User, related_name='liked_posts', blank=True)
 
+    class Meta:
+        indexes = [
+            GinIndex(
+                SearchVector('title', 'content', config='pg_catalog.russian'), 
+                name='post_search_vector_idx'
+            ),
+            BrinIndex(fields=['created_at'], name='post_created_at_brin_idx'),
+        ]
+
     def __str__(self):
         return self.title
 
@@ -54,6 +70,12 @@ class Comment(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE)
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            GinIndex(SearchVector('content', config='pg_catalog.russian'), name='comment_content_search_idx'),
+            BrinIndex(fields=['created_at'], name='comment_created_at_brin_idx'),
+        ]
 
     def __str__(self):
         return f"Comment by {self.author.username} on {self.post.title}"
@@ -74,8 +96,13 @@ class Notification(models.Model):
     actor = models.ForeignKey(User, related_name='acted_notifications', on_delete=models.CASCADE)
     verb = models.CharField(max_length=255)
     target = models.ForeignKey(Post, null=True, blank=True, on_delete=models.CASCADE)
-    read = models.BooleanField(default=False)
+    read = models.BooleanField(default=False, db_index=True)
     timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            BrinIndex(fields=['timestamp'], name='notification_timestamp_brin_idx'),
+        ]
 
     def __str__(self):
         return f"{self.actor} {self.verb} {self.target}"

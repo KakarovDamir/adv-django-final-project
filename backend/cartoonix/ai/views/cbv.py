@@ -21,10 +21,9 @@ logger = logging.getLogger('api_logger')
 
 class GenerateVideo(APIView):
     permission_classes = [IsAuthenticated, DjangoModelPermissions]
-    queryset = VideoPrompt.objects.none()
     
     def get_queryset(self):
-        return VideoPrompt.objects.none()
+        return VideoPrompt.objects.all()
         
     @swagger_auto_schema(
         operation_summary="Generate video from user prompt",
@@ -134,10 +133,9 @@ class GenerateVideo(APIView):
 
 class VideoDetail(APIView):
     permission_classes = [IsAuthenticated, DjangoModelPermissions]
-    queryset = VideoPrompt.objects.none()
     
     def get_queryset(self):
-        return VideoPrompt.objects.none()
+        return VideoPrompt.objects.all()
         
     @swagger_auto_schema(
         operation_summary="Retrieve a single video by ID",
