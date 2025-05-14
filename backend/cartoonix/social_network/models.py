@@ -7,6 +7,7 @@ from django.db.models.signals import post_save
 from ai.models import VideoPrompt
 from django import forms
 from django.dispatch import receiver
+from django.contrib.auth import get_user_model
 
 logger = logging.getLogger('model_logger')
 
@@ -24,7 +25,7 @@ class Profile(models.Model):
     def is_friend(self, profile):
         return self.friends.filter(id=profile.id).exists()
 
-@receiver(post_save, sender=User)
+@receiver(post_save, sender=get_user_model())
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
         Profile.objects.create(user=instance)
@@ -34,7 +35,7 @@ def save_user_profile(sender, instance, **kwargs):
     instance.profile.save()
 
 class Post(models.Model):
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts')
     title = models.CharField(max_length=200)
     content = models.TextField()
     image = models.ImageField(upload_to='posts/', blank=True, null=True)

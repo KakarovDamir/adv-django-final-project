@@ -1,16 +1,17 @@
 from django.contrib.auth import authenticate, login, logout
 from django.views.decorators.csrf import ensure_csrf_cookie
-from .serializers import UserSerializer, NotificationSerializer, PostSerializer, CommentSerializer, ProfileSerializer, ProfileUpdateSerializer
-from .models import Notification, Post, Comment, FriendRequest, Profile
-from rest_framework.decorators import api_view, permission_classes
+from .serializers import UserSerializer, NotificationSerializer, PostSerializer, CommentSerializer, ProfileSerializer, ProfileUpdateSerializer, RegisterSerializer
+from .models import Notification, Post, FriendRequest, Profile
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.views.decorators.csrf import csrf_protect
 from django.shortcuts import get_object_or_404
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+from django.contrib.auth import get_user_model
 from django.http import JsonResponse
 from rest_framework.permissions import AllowAny
-from rest_framework.decorators import permission_classes
 
 
 @ensure_csrf_cookie
@@ -41,22 +42,34 @@ def api_logout(request):
 
 
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def api_register(request):
-    serializer = UserSerializer(data=request.data)
+    serializer = RegisterSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
-        login(request, user)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        user = authenticate(
+            username=serializer.data['username'],
+            password=request.data['password']
+        )
+        if user:
+            login(request, user)
+            return Response({
+                'user': UserSerializer(user).data,
+                'message': 'Registration successful'
+            }, status=status.HTTP_201_CREATED)
+    return Response({
+        'errors': serializer.errors
+    }, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def post_list_create(request):
     if request.method == 'GET':
-        posts = Post.objects.all()
-        serializer = PostSerializer(posts, many=True)
+        posts = Post.objects.all().order_by('-created_at')
+        serializer = PostSerializer(posts, many=True, context={'request': request})
         return Response(serializer.data)
+
 
     elif request.method == 'POST':
         serializer = PostSerializer(data=request.data)
@@ -75,7 +88,7 @@ def post_detail(request, pk):
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     if request.method == 'GET':
-        serializer = PostSerializer(post)
+        serializer = PostSerializer(post, context={'request': request})
         return Response(serializer.data)
 
     elif request.method == 'PUT':
@@ -118,10 +131,28 @@ def comment_list_create(request, post_id):
 
 
 @api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([AllowAny])
 def profile_detail(request, username):
-    profile = get_object_or_404(Profile, user__username=username)
-    serializer = ProfileSerializer(profile)
-    return Response(serializer.data)
+    try:
+        # Исправляем: ищем User, а не Profile
+        user = get_user_model().objects.get(username__iexact=username)
+        profile = user.profile
+        
+        # Используем сериализатор вместо ручного формирования ответа
+        serializer = ProfileSerializer(profile, context={'request': request})
+        return Response(serializer.data)
+        
+    except get_user_model().DoesNotExist:  # Изменяем тип исключения
+        return Response(
+            {'error': f'User "{username}" not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Profile.DoesNotExist:  # Добавляем проверку на отсутствие профиля
+        return Response(
+            {'error': 'Profile not found for user'},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
 
 @api_view(['PUT'])
@@ -216,5 +247,52 @@ def mark_notification_as_read(request, notification_id):
     notification.read = True
     notification.save()
     return Response({'message': 'Notification marked as read'})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def post_like(request, post_id):
+    post = get_object_or_404(Post, pk=post_id)
+    if post.likes.filter(id=request.user.id).exists():
+        post.likes.remove(request.user)
+        return Response({'liked': False, 'count': post.total_likes()})
+    else:
+        post.likes.add(request.user)
+        return Response({'liked': True, 'count': post.total_likes()})
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def post_update(request, pk):
+    post = get_object_or_404(Post, pk=pk)
+    if post.author != request.user:
+        return Response({"error": "You are not the author"}, status=403)
+    
+    serializer = PostSerializer(
+        post, 
+        data=request.data, 
+        partial=request.method == 'PATCH',
+        context={'request': request}
+    )
+    
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=400)
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def post_delete(request, pk):
+    post = get_object_or_404(Post, pk=pk)
+    if post.author != request.user:
+        return Response({"error": "You are not the author"}, status=403)
+    
+    post.delete()
+    return Response(status=204)
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def current_user(request):
+    serializer = UserSerializer(request.user)
+    return Response(serializer.data)
 
 

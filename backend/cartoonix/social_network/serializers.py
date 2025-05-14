@@ -27,13 +27,31 @@ class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
         write_only=True,
         required=True,
-        validators=[validate_password]
+        validators=[validate_password],
+        style={'input_type': 'password'}
     )
-    password2 = serializers.CharField(write_only=True, required=True)
+    password2 = serializers.CharField(
+        write_only=True,
+        required=True,
+        style={'input_type': 'password'}
+    )
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'password', 'password2', 'first_name', 'last_name']
+        fields = ['username', 'email', 'password', 'password2']
+        extra_kwargs = {
+            'email': {'required': True}
+        }
+
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Email already exists")
+        return value
+
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("Username already taken")
+        return value
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
@@ -52,40 +70,6 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 
-class PostSerializer(serializers.ModelSerializer):
-    author = serializers.SerializerMethodField()
-    likes_count = serializers.SerializerMethodField()
-    comments_count = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Post
-        fields = [
-            'id', 'title', 'content', 'image',
-            'created_at', 'updated_at', 'author',
-            'likes_count', 'comments_count'
-        ]
-        read_only_fields = ['author', 'created_at', 'updated_at']
-
-    def get_author(self, obj):
-        return {
-            'id': obj.author.id,
-            'username': obj.author.username,
-            'avatar': obj.author.profile.avatar.url if obj.author.profile.avatar else None
-        }
-
-    def get_likes_count(self, obj):
-        return obj.likes.count()
-
-    def get_comments_count(self, obj):
-        return obj.comments.count()
-
-
-class PostCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Post
-        fields = ['title', 'content', 'image']
-
-
 class CommentSerializer(serializers.ModelSerializer):
     author = serializers.SerializerMethodField()
 
@@ -102,12 +86,55 @@ class CommentSerializer(serializers.ModelSerializer):
         }
 
 
+class PostSerializer(serializers.ModelSerializer):
+    author = serializers.SerializerMethodField()
+    is_liked = serializers.SerializerMethodField()
+    total_likes = serializers.IntegerField(source='likes.count', read_only=True)
+    comments_count = serializers.SerializerMethodField()
+    comments = CommentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Post
+        fields = [
+            'id', 'title', 'content', 'image',
+            'created_at', 'updated_at', 'author',
+            'total_likes', 'is_liked', 'comments_count', 'comments'
+        ]
+        read_only_fields = ['author', 'created_at', 'updated_at']
+
+    def get_author(self, obj):
+        return {
+            'id': obj.author.id,
+            'username': obj.author.username,
+            'avatar': obj.author.profile.avatar.url if obj.author.profile.avatar else None
+        }
+
+    def get_is_liked(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.likes.filter(id=request.user.id).exists()
+        return False
+
+    def get_comments_count(self, obj):
+        return obj.comments.count()
+
+    def update(self, instance, validated_data):
+        # Проверка прав при обновлении
+        if self.context['request'].user != instance.author:
+            raise serializers.ValidationError("You are not the author of this post")
+        return super().update(instance, validated_data)
+
+
+class PostCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Post
+        fields = ['title', 'content', 'image']
+
+
 class CommentCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ['content']
-
-
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -118,11 +145,13 @@ class ProfileSerializer(serializers.ModelSerializer):
     friends_count = serializers.SerializerMethodField()
     posts_count = serializers.SerializerMethodField()
     is_friend = serializers.SerializerMethodField()
+    id = serializers.IntegerField(source='user.id', read_only=True)
 
     class Meta:
         model = Profile
         fields = [
-            'id', 'username', 'email', 'first_name', 'last_name',
+            'id',
+            'username', 'email', 'first_name', 'last_name',
             'bio', 'avatar', 'birth_date', 'friends_count',
             'posts_count', 'is_friend'
         ]
