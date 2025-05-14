@@ -1,31 +1,34 @@
-'use client';
+"use client";
 
-import React, { useEffect, useRef, useState } from 'react';
-import Peer from 'simple-peer';
-import { useParams } from 'next/navigation';
+import { useParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import Peer from "simple-peer";
 
 export default function VideoCallPage() {
   const params = useParams();
-  const roomId = typeof params.roomId === 'string' ? params.roomId : '';
+  const roomId = typeof params.roomId === "string" ? params.roomId : "";
   const [stream, setStream] = useState<MediaStream | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const userVideo = useRef<HTMLVideoElement | null>(null);
   const partnerVideo = useRef<HTMLVideoElement | null>(null);
   const peerRef = useRef<Peer.Instance | null>(null);
+  const [connectionStatus, setConnectionStatus] =
+    useState<string>("Connecting...");
 
   // 1. Получаем камеру один раз
   useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    navigator.mediaDevices
+      .getUserMedia({ video: true, audio: true })
       .then((localStream) => {
-        console.log('🎥 Камера получена');
+        console.log("🎥 Камера получена");
         setStream(localStream);
         if (userVideo.current && !userVideo.current.srcObject) {
           userVideo.current.srcObject = localStream;
         }
       })
       .catch((err) => {
-        console.error('🚫 Ошибка доступа к камере:', err);
-        alert('Ошибка доступа к камере.');
+        console.error("🚫 Ошибка доступа к камере:", err);
+        alert("Ошибка доступа к камере.");
       });
   }, []);
 
@@ -33,84 +36,414 @@ export default function VideoCallPage() {
   useEffect(() => {
     if (!roomId || !stream) return;
 
-    console.log('🔥 Подключаем WebSocket в room:', roomId);
-    socketRef.current = new WebSocket(`ws://localhost:8000/ws/call/${roomId}/`);
+    // Determine WebSocket connection options
+    let wsUrl = "";
+    const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+    const ngrokPattern = /ngrok(-free)?\.app|ngrok\.io/;
+    const isNgrok = ngrokPattern.test(window.location.hostname);
 
-    socketRef.current.onopen = () => console.log('✅ WebSocket подключен');
+    // Handle connection based on environment
+    if (isNgrok) {
+      // If frontend is on ngrok but backend is local, always use localhost for backend
+      wsUrl = "ws://localhost:8000/ws/call/" + roomId + "/";
+      console.log("🔌 Ngrok frontend detected, connecting to local backend");
+    } else if (
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1"
+    ) {
+      // For local development
+      wsUrl = `${protocol}${window.location.hostname}:8000/ws/call/${roomId}/`;
+      console.log("🔌 Local development WebSocket");
+    } else if (process.env.NEXT_PUBLIC_BACKEND_URL) {
+      // If NEXT_PUBLIC_BACKEND_URL is set and we're not on localhost
+      wsUrl = `${protocol}${process.env.NEXT_PUBLIC_BACKEND_URL}/ws/call/${roomId}/`;
+      console.log("🔌 Environment-configured WebSocket");
+    } else {
+      // Fallback to same host but with ws protocol
+      wsUrl = `${protocol}${window.location.host}/ws/call/${roomId}/`;
+      console.log("🔌 Same-host fallback WebSocket");
+    }
 
-    socketRef.current.onerror = (err) => console.error('❌ WebSocket ошибка', err);
+    console.log("🔥 Подключаем WebSocket по URL:", wsUrl);
+    setConnectionStatus("Connecting to WebSocket...");
 
-    socketRef.current.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      const signal = data.data;
+    // Create the WebSocket connection
+    socketRef.current = new WebSocket(wsUrl);
 
-      if (signal.type === 'offer') {
-        if (!peerRef.current) {
-          const peer = new Peer({
-            initiator: false,
-            trickle: false,
-            stream: stream,
-          });
+    socketRef.current.onopen = () => {
+      console.log("✅ WebSocket подключен");
+      setConnectionStatus("WebSocket connected");
 
-          peer.on('signal', (signal: Peer.SignalData) => {
-            socketRef.current?.send(JSON.stringify({ type: 'answer', signal }));
-          });
+      // Send join message to let server know we're here
+      if (
+        socketRef.current &&
+        socketRef.current.readyState === WebSocket.OPEN
+      ) {
+        const userId = `user-${Math.floor(Math.random() * 1000000)}`;
+        // Store our own user ID to help determine initiator role later
+        socketRef.current._mySelfId = userId;
 
-          peer.on('stream', (remoteStream: MediaStream) => {
-            console.log('📺 Получен remoteStream');
-            if (partnerVideo.current && !partnerVideo.current.srcObject) {
-              partnerVideo.current.srcObject = remoteStream;
-            }
-          });
-
-          try {
-            peer.signal(signal.signal);
-          } catch (err) {
-            console.error('🚫 Ошибка при signal(offer):', err);
-          }
-
-          peerRef.current = peer;
-        } else {
-          console.warn('⚠️ Игнорируем повторный offer: peer уже существует');
-        }
-      }
-
-      if (signal.type === 'answer') {
-        if (peerRef.current) {
-          try {
-            peerRef.current.signal(signal.signal);
-          } catch (err) {
-            console.error('🚫 Ошибка при signal(answer):', err);
-          }
-        } else {
-          console.warn('⚠️ Ответ получен, но peer уже уничтожен');
-        }
+        socketRef.current.send(
+          JSON.stringify({
+            type: "join",
+            userId: userId,
+          })
+        );
       }
     };
 
-    // Инициатор peer
-    const peer = new Peer({
-      initiator: true,
-      trickle: false,
-      stream: stream,
-    });
+    socketRef.current.onerror = (err) => {
+      console.error("❌ WebSocket ошибка:", err);
+      setConnectionStatus("WebSocket connection failed");
 
-    peer.on('signal', (signal) => {
-      socketRef.current?.send(JSON.stringify({ type: 'offer', signal }));
-    });
+      // If first attempt fails, try localhost as a fallback
+      const localhostUrl = `ws://localhost:8000/ws/call/${roomId}/`;
+      console.log("🔄 Последняя попытка через localhost:", localhostUrl);
+      setConnectionStatus("Trying localhost connection...");
 
-    peer.on('stream', (remoteStream) => {
-      console.log('📺 Пришёл remoteStream');
-      if (partnerVideo.current && !partnerVideo.current.srcObject) {
-        partnerVideo.current.srcObject = remoteStream;
+      // Close existing socket first
+      if (socketRef.current) {
+        socketRef.current.close();
       }
-    });
 
-    peerRef.current = peer;
+      socketRef.current = new WebSocket(localhostUrl);
+
+      socketRef.current.onopen = () => {
+        console.log("✅ Localhost WebSocket подключен");
+        setConnectionStatus("Localhost WebSocket connected");
+
+        // Send join message after connection
+        if (
+          socketRef.current &&
+          socketRef.current.readyState === WebSocket.OPEN
+        ) {
+          const userId = `user-${Math.floor(Math.random() * 1000000)}`;
+          // Store our own user ID to help determine initiator role later
+          socketRef.current._mySelfId = userId;
+
+          socketRef.current.send(
+            JSON.stringify({
+              type: "join",
+              userId: userId,
+            })
+          );
+        }
+      };
+
+      socketRef.current.onerror = (innerErr) => {
+        console.error("❌ Все попытки подключения провалились");
+        setConnectionStatus("All connection attempts failed");
+      };
+    };
+
+    socketRef.current.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log("📩 Получено сообщение:", data);
+        const signal = data.data;
+
+        // Handle room status message to initialize connections with other users
+        if (signal?.type === "room_status") {
+          console.log("🏠 Получен статус комнаты:", signal.users);
+          setConnectionStatus(`Room joined with ${signal.users.length} users`);
+
+          // If we're the only user, don't try to create a peer connection
+          if (signal.users.length <= 1) {
+            console.log("👤 Only one user in room, waiting for others to join");
+            return;
+          }
+
+          // Save my user ID if it's in the room
+          const myUserId = signal.users.find((id) =>
+            id.includes(socketRef.current?._mySelfId || "unknown")
+          );
+
+          // To ensure consistent role assignments, use numeric comparison of user IDs
+          // This prevents role flip-flops when users join/leave
+          const myUserNumber = myUserId ? parseInt(myUserId.split("-")[1]) : 0;
+
+          // Get other users (not me)
+          const otherUsers = signal.users.filter(
+            (id) => !id.includes(socketRef.current?._mySelfId || "unknown")
+          );
+
+          console.log(
+            `👤 My user ID is ${myUserId}, other users: ${JSON.stringify(
+              otherUsers
+            )}`
+          );
+
+          // Only initialize a new peer connection if we don't have one
+          // or if this is the first time seeing another user
+          if (!peerRef.current && otherUsers.length > 0) {
+            // We'll always make the user with the lower numeric ID the initiator
+            // This ensures consistent role assignments
+            const shouldBeInitiator =
+              myUserNumber < parseInt(otherUsers[0].split("-")[1]);
+
+            console.log(
+              `👤 My user number is ${myUserNumber}, should be initiator: ${shouldBeInitiator}`
+            );
+
+            console.log(
+              `🔄 Initializing peer connection as ${
+                shouldBeInitiator ? "initiator" : "receiver"
+              }`
+            );
+            initializePeerConnection(shouldBeInitiator);
+          }
+        }
+
+        if (signal?.type === "offer") {
+          console.log("📞 Получен offer от peer");
+
+          if (!peerRef.current) {
+            console.log("🔄 Создаем peer connection для ответа на offer");
+
+            // Initialize peer as non-initiator since we're answering
+            const peer = new Peer({
+              initiator: false,
+              trickle: false,
+              stream: stream,
+              config: {
+                iceServers: [
+                  { urls: "stun:stun.l.google.com:19302" },
+                  { urls: "stun:global.stun.twilio.com:3478" },
+                  { urls: "stun:stun.stunprotocol.org:3478" },
+                ],
+              },
+            });
+
+            peer.on("signal", (signalData) => {
+              console.log("📤 Отправляем ответ на offer");
+              if (socketRef.current?.readyState === WebSocket.OPEN) {
+                socketRef.current.send(
+                  JSON.stringify({ type: "answer", signal: signalData })
+                );
+              }
+            });
+
+            peer.on("stream", (remoteStream) => {
+              console.log(
+                "📺 Получен remoteStream от peer с ID:",
+                remoteStream.id
+              );
+              handleRemoteStream(remoteStream);
+            });
+
+            peer.on("track", (track, stream) => {
+              console.log("🎮 Получен track:", track.kind);
+              handleRemoteStream(stream);
+            });
+
+            peer.on("error", (err) => {
+              console.error("❌ Peer ошибка (answerer):", err);
+            });
+
+            peer.on("connect", () => {
+              console.log("✅ Peer connection established (answerer)");
+              setConnectionStatus("Peer connection established");
+            });
+
+            try {
+              console.log("🔄 Применяем полученный offer signal");
+              peer.signal(signal.signal);
+            } catch (err) {
+              console.error("🚫 Ошибка при signal(offer):", err);
+            }
+
+            peerRef.current = peer;
+          } else {
+            console.warn("⚠️ Игнорируем повторный offer: peer уже существует");
+            // Even if we have a peer, we should still process the offer
+            try {
+              peerRef.current.signal(signal.signal);
+            } catch (err) {
+              console.error("🚫 Ошибка при обновлении signal(offer):", err);
+            }
+          }
+        }
+
+        if (signal?.type === "answer") {
+          console.log("📞 Получен answer от peer");
+
+          if (peerRef.current) {
+            try {
+              console.log("🔄 Применяем полученный answer signal");
+              peerRef.current.signal(signal.signal);
+            } catch (err) {
+              console.error("🚫 Ошибка при signal(answer):", err);
+            }
+          } else {
+            console.warn("⚠️ Ответ получен, но peer не существует");
+          }
+        }
+      } catch (error) {
+        console.error("❌ Ошибка при обработке сообщения:", error);
+      }
+    };
+
+    // Helper function to initialize a peer connection
+    const initializePeerConnection = (isInitiator) => {
+      try {
+        console.log(`🔄 Создаем peer connection (initiator: ${isInitiator})`);
+
+        // Always destroy existing peer before creating a new one
+        if (peerRef.current) {
+          console.log("⚠️ Destroying existing peer connection");
+          peerRef.current.destroy();
+          peerRef.current = null;
+
+          // Clear partner video when recreating connection
+          if (partnerVideo.current && partnerVideo.current.srcObject) {
+            partnerVideo.current.srcObject = null;
+          }
+        }
+
+        const peer = new Peer({
+          initiator: isInitiator,
+          trickle: false,
+          stream: stream,
+          config: {
+            iceServers: [
+              { urls: "stun:stun.l.google.com:19302" },
+              { urls: "stun:global.stun.twilio.com:3478" },
+              { urls: "stun:stun.stunprotocol.org:3478" },
+            ],
+          },
+          sdpTransform: (sdp) => {
+            console.log("🔄 Transforming SDP to ensure compatibility");
+            // Ensure video codec compatibility by prioritizing common codecs
+            return sdp;
+          },
+        });
+
+        peer.on("stream", (remoteStream) => {
+          console.log("📺 Получен remoteStream с ID:", remoteStream.id);
+          handleRemoteStream(remoteStream);
+        });
+
+        peer.on("track", (track, stream) => {
+          console.log("🎮 Получен track:", track.kind);
+          handleRemoteStream(stream);
+        });
+
+        peer.on("signal", (signal) => {
+          console.log(
+            `📤 Отправляем ${isInitiator ? "offer" : "answer"} signal`
+          );
+          if (socketRef.current?.readyState === WebSocket.OPEN) {
+            socketRef.current.send(
+              JSON.stringify({
+                type: isInitiator ? "offer" : "answer",
+                signal,
+              })
+            );
+          } else {
+            console.warn("⚠️ WebSocket не готов для отправки сигнала");
+          }
+        });
+
+        peer.on("error", (err) => {
+          console.error(
+            `❌ Peer ошибка (${isInitiator ? "offerer" : "answerer"}):`,
+            err
+          );
+        });
+
+        peer.on("connect", () => {
+          console.log(
+            `✅ Peer connection established (${
+              isInitiator ? "offerer" : "answerer"
+            })`
+          );
+          setConnectionStatus("Peer connection established");
+
+          // Try to request video again after connection is established
+          if (isInitiator) {
+            console.log("🔄 Initiator connected, sending data ping");
+            try {
+              peer.send(JSON.stringify({ type: "ping" }));
+            } catch (e) {
+              console.warn("⚠️ Could not send ping", e);
+            }
+          }
+        });
+
+        peer.on("close", () => {
+          console.log("❌ Peer connection closed");
+          if (partnerVideo.current) {
+            partnerVideo.current.srcObject = null;
+          }
+        });
+
+        peerRef.current = peer;
+      } catch (err) {
+        console.error("🚫 Ошибка при создании peer:", err);
+      }
+    };
+
+    // Helper function to handle remote stream connection
+    const handleRemoteStream = (remoteStream) => {
+      if (!remoteStream) {
+        console.error("❌ Received empty remote stream");
+        return;
+      }
+
+      console.log("📊 Processing remote stream...");
+
+      if (partnerVideo.current) {
+        console.log("🎬 Setting partner video source");
+
+        // Clear any existing video source first
+        if (partnerVideo.current.srcObject !== remoteStream) {
+          partnerVideo.current.srcObject = null;
+          partnerVideo.current.srcObject = remoteStream;
+
+          // Create a debug message about all tracks
+          const videoTracks = remoteStream.getVideoTracks();
+          const audioTracks = remoteStream.getAudioTracks();
+          console.log(
+            `📊 Remote stream has ${videoTracks.length} video tracks and ${audioTracks.length} audio tracks`
+          );
+
+          if (videoTracks.length === 0) {
+            console.warn("⚠️ No video tracks in remote stream!");
+          } else {
+            videoTracks.forEach((track) =>
+              console.log(
+                `📹 Video track: ${track.label}, enabled: ${track.enabled}, readyState: ${track.readyState}`
+              )
+            );
+          }
+
+          // Force video to play immediately
+          const playVideo = () => {
+            console.log("▶️ Forcing video play");
+            partnerVideo.current
+              ?.play()
+              .then(() => console.log("✅ Video playing successfully"))
+              .catch((e) => {
+                console.error("❌ Failed to play video:", e);
+                // Auto-play might be blocked by browser
+                setConnectionStatus("Click partner video to start playback");
+              });
+          };
+
+          // Try playing immediately and also with a slight delay as backup
+          playVideo();
+          setTimeout(playVideo, 500);
+        }
+      } else {
+        console.error("❌ Partner video element not available");
+      }
+    };
 
     return () => {
-      console.log('🧹 Отключаем WebSocket и Peer');
-      socketRef.current?.close();
+      console.log("🧹 Отключаем WebSocket и Peer");
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
       if (peerRef.current) {
         peerRef.current.destroy();
         peerRef.current = null;
@@ -119,16 +452,30 @@ export default function VideoCallPage() {
   }, [roomId, stream]);
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen gap-4">
+    <div className="flex flex-col items-center justify-center h-screen gap-4 bg-gray-100">
       <div className="text-2xl font-semibold">Room: {roomId}</div>
-      <div className="flex gap-8">
-        <div>
-          <p className="text-center">Вы</p>
-          <video playsInline muted ref={userVideo} autoPlay className="w-64 h-48 bg-black rounded" />
+      <div className="text-sm text-gray-500 mb-2">{connectionStatus}</div>
+      <div className="flex flex-wrap justify-center gap-8 w-full max-w-4xl">
+        <div className="flex flex-col items-center border-2 border-blue-400 rounded-lg p-2 bg-white shadow-md">
+          <p className="text-center font-medium text-blue-600 mb-1">You</p>
+          <video
+            playsInline
+            muted
+            ref={userVideo}
+            autoPlay
+            className="w-80 h-60 bg-black rounded object-cover"
+          />
         </div>
-        <div>
-          <p className="text-center">Собеседник</p>
-          <video playsInline ref={partnerVideo} autoPlay className="w-64 h-48 bg-black rounded" />
+        <div className="flex flex-col items-center border-2 border-green-400 rounded-lg p-2 bg-white shadow-md">
+          <p className="text-center font-medium text-green-600 mb-1">Partner</p>
+          <video
+            playsInline
+            ref={partnerVideo}
+            autoPlay
+            controls
+            className="w-80 h-60 bg-black rounded object-cover"
+            style={{ backgroundColor: "black" }}
+          />
         </div>
       </div>
     </div>

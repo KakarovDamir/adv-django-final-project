@@ -29,8 +29,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Upgrade pip
 RUN pip install --upgrade pip setuptools wheel
 
-# Install Django, Channels, Daphne, Celery and Redis explicitly first
-RUN pip install Django==5.1.3 celery==5.4.0 redis==5.2.0 channels==4.0.0 daphne==4.0.0
+# Install Django, Channels, Daphne, Celery, Redis and channels_redis explicitly first
+RUN pip install Django==5.1.3 celery==5.4.0 redis==5.2.0 channels==4.0.0 daphne==4.0.0 channels_redis>=4.1.0
 
 # Install Python dependencies
 COPY requirements.txt .

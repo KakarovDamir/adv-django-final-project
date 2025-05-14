@@ -36,7 +36,7 @@ SECRET_KEY = 'django-insecure-x^i)oq3eg3#c2cixzi3_17r8(^e&m607ck^serj&z8h$5#+p-y
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '*', '192.168.65.1:29336', '2a20-5-251-210-196.ngrok-free.app', '192.168.65.1:53028', '.ngrok-free.app', '.ngrok.io']
 
 
 INSTALLED_APPS = [
@@ -274,14 +274,54 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
-CORS_ALLOW_CREDENTIALS = True
+# Add additional CORS settings for WebSockets
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ORIGIN_ALLOW_ALL = True  # Allow connections from any origin
+
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    "https://2a20-5-251-210-196.ngrok-free.app",
+    "http://frontend:3000",  # Add Docker container hostname
+    "http://localhost:8000",
+    "http://backend:8000",
 ]
-CSRF_TRUSTED_ORIGINS = [
+CORS_TRUSTED_ORIGINS = [
     "http://localhost:3000",
+    "https://2a20-5-251-210-196.ngrok-free.app",
+    "http://frontend:3000",  # Add Docker container hostname
+    "http://localhost:8000",
+    "http://backend:8000",
+    "https://*.ngrok-free.app",  # Allow any ngrok subdomain
+    "https://*.ngrok.io",
+    "http://*.ngrok.io",
 ]
-SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SAMESITE = 'None'  # Allow cross-site cookies
+SESSION_COOKIE_SECURE = True  # Cookies only sent over HTTPS
+
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'access-control-allow-origin',
+]
+
+# Allow credentials for cross-origin requests
+CORS_ALLOW_CREDENTIALS = True
+
 SWAGGER_SETTINGS = {
     'SECURITY_DEFINITIONS': {
         'Bearer': {

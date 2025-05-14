@@ -11,6 +11,8 @@ from ai.s3_utils import upload_image_to_s3, upload_video_to_s3
 from ai.serializers import VideoPromptSerializer
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
 from moviepy import VideoFileClip, concatenate_videoclips
 from rest_framework import status
 from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated

@@ -29,7 +29,7 @@ services:
       - PYTHONPATH=/app:/app/cartoonix
       - DJANGO_SETTINGS_MODULE=cartoonix.settings
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ALLOWED_HOSTS=localhost,127.0.0.1,138.68.87.67
+      - ALLOWED_HOSTS=localhost,127.0.0.1,138.68.87.67,backend,frontend,*
     ports:
       - "8000:8000"
     depends_on:
@@ -39,7 +39,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    command: sh -c "python /app/cartoonix/manage.py migrate && python /app/cartoonix/manage.py runserver 0.0.0.0:8000"
+    command: sh -c "python /app/cartoonix/manage.py migrate && daphne -b 0.0.0.0 -p 8000 cartoonix.asgi:application"
     healthcheck:
       test: ["CMD", "python", "/healthcheck_django.py"]
       interval: 15s
@@ -51,6 +51,8 @@ services:
         limits:
           memory: 2G
     restart: unless-stopped
+    networks:
+      - app-network
 
   # Celery worker for async tasks
   celery_worker:
@@ -86,6 +88,8 @@ services:
         limits:
           memory: 1G
     restart: unless-stopped
+    networks:
+      - app-network
 
   # Celery beat for scheduled tasks
   celery_beat:
@@ -125,6 +129,8 @@ services:
         limits:
           memory: 512M
     restart: unless-stopped
+    networks:
+      - app-network
 
   # Frontend service (React)
   frontend:
@@ -139,14 +145,19 @@ services:
       - "3000:3000"
     environment:
       - REACT_APP_API_URL=http://localhost:8000/api
+      - NEXT_PUBLIC_BACKEND_URL=localhost:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+      - NEXT_PUBLIC_WS_URL=ws://localhost:8000
     depends_on:
       - backend
-    command: npm run dev
+    command: npm run dev -- --hostname 0.0.0.0
     deploy:
       resources:
         limits:
           memory: 1G
     restart: unless-stopped
+    networks:
+      - app-network
 
   # PostgreSQL Database
   db:
@@ -173,6 +184,8 @@ services:
         limits:
           memory: 1G
     restart: unless-stopped
+    networks:
+      - app-network
 
   db_replica:
     image: postgres:15
@@ -198,6 +211,8 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - app-network
 
   # Redis for caching and as a message broker
   redis:
@@ -212,6 +227,12 @@ services:
         limits:
           memory: 512M
     restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
   postgres_data_master:

@@ -1,19 +1,25 @@
 import os
+
 import django
-from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.auth import AuthMiddlewareStack
-from django.core.asgi import get_asgi_application
 
+# Set up Django settings before importing specific Django modules
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cartoonix.settings')
-django.setup()  # ✅ это должно идти ДО других импортов
+django.setup()  # This must come before other imports
 
-import videochat.routing  # ✅ после setup()
+import videochat.routing  # Must be imported after Django setup
+from channels.auth import AuthMiddlewareStack
+# Now import specific Django modules
+from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.security.websocket import AllowedHostsOriginValidator
+from django.core.asgi import get_asgi_application
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),
-    "websocket": AuthMiddlewareStack(
-        URLRouter(
-            videochat.routing.websocket_urlpatterns
+    "websocket": AllowedHostsOriginValidator(
+        AuthMiddlewareStack(
+            URLRouter(
+                videochat.routing.websocket_urlpatterns
+            )
         )
     ),
 })
