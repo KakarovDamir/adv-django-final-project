@@ -11,12 +11,13 @@ from rest_framework.decorators import (api_view, authentication_classes,
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from .models import FriendRequest, Notification, Post, Profile
+from .models import Comment, FriendRequest, Notification, Post, Profile
 from .serializers import (CommentSerializer, FriendRequestSerializer,
                           NotificationSerializer, PostSerializer,
                           ProfileSerializer, ProfileUpdateSerializer,
                           RegisterSerializer, UserSerializer)
 from django.contrib.auth.models import User
+from .permissions import CanEditOrDeletePost, CanManageComment
 
 @ensure_csrf_cookie
 def get_csrf(request):
@@ -84,7 +85,7 @@ def post_list_create(request):
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, CanEditOrDeletePost])
 def post_detail(request, pk):
     try:
         post = Post.objects.get(pk=pk)
@@ -96,18 +97,13 @@ def post_detail(request, pk):
         return Response(serializer.data)
 
     elif request.method == 'PUT':
-        if post.author != request.user:
-            return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
-
-        serializer = PostSerializer(post, data=request.data)
+        serializer = PostSerializer(post, data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
-        if post.author != request.user:
-            return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
         post.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -297,11 +293,9 @@ def post_like(request, post_id):
         return Response({'liked': True, 'count': post.total_likes()})
 
 @api_view(['PUT', 'PATCH'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, CanEditOrDeletePost])
 def post_update(request, pk):
     post = get_object_or_404(Post, pk=pk)
-    if post.author != request.user:
-        return Response({"error": "You are not the author"}, status=403)
     
     serializer = PostSerializer(
         post, 
@@ -313,17 +307,15 @@ def post_update(request, pk):
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data)
-    return Response(serializer.errors, status=400)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, CanEditOrDeletePost])
 def post_delete(request, pk):
     post = get_object_or_404(Post, pk=pk)
-    if post.author != request.user:
-        return Response({"error": "You are not the author"}, status=403)
     
     post.delete()
-    return Response(status=204)
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])
