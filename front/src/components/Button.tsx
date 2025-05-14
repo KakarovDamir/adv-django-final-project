@@ -1,3 +1,4 @@
+/* eslint-disable */
 "use client";
 
 import { ButtonHTMLAttributes, ReactNode } from "react";

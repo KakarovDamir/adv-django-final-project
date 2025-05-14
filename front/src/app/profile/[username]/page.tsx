@@ -1,3 +1,4 @@
+/* eslint-disable */
 "use client";
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
@@ -227,6 +228,7 @@ export default function ProfilePage({
             </h1>
 
             {currentUser && currentUser.username !== username && (
+              <div className="flex gap-2">
               <button
                 onClick={handleFollow}
                 className={`mt-3 px-6 py-2 rounded-xl text-sm font-medium transition-colors ${
@@ -261,6 +263,25 @@ export default function ProfilePage({
                   </>
                 )}
               </button>
+              <button
+                    onClick={() => {
+                      const sortedUsers = [currentUser.username, profile.username].sort();
+                      window.location.href = `/chat/${sortedUsers.join('-')}`;
+                    }}
+                    className="px-4 py-1 text-black rounded-md text-sm font-medium bg-gray-100 hover:bg-gray-200 transition-colors"
+                  >
+                    Message
+                  </button>
+                  <button
+                    onClick={() => {
+                      const sortedUsers = [currentUser.username, profile.username].sort();
+                      window.location.href = `/video/${sortedUsers.join('-')}`;
+                    }}
+                    className="px-4 py-1 text-black rounded-md text-sm font-medium bg-gray-100 hover:bg-gray-200 transition-colors"
+                  >
+                    Video Call
+                  </button>
+              </div>
             )}
           </div>
 

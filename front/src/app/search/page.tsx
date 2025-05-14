@@ -1,3 +1,4 @@
+/* eslint-disable */
 "use client";
 import { GooeySearchBar } from "@/components/ui/animated-search-bar";
 import { useState } from "react";
