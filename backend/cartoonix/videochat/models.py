@@ -6,11 +6,9 @@ from django.contrib.postgres.indexes import GinIndex, BrinIndex
 
 User = get_user_model()
 
-
-class Room(models.Model):
-    name = models.CharField(max_length=255, db_index=True)
-    slug = models.SlugField(unique=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+class ChatRoom(models.Model):
+    name = models.CharField(max_length=255)
+    participants = models.ManyToManyField(User, related_name='chat_rooms')
 
     class Meta:
         indexes = [
@@ -20,35 +18,19 @@ class Room(models.Model):
     def __str__(self):
         return self.name
 
-
 class Message(models.Model):
-    room = models.ForeignKey(Room, related_name='messages', on_delete=models.CASCADE)
-    user = models.ForeignKey(User, related_name='messages', on_delete=models.CASCADE)
+    room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name='messages')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE)
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 
-    class Meta:
-        ordering = ('timestamp',)
-        indexes = [
-            GinIndex(SearchVector('content', config='pg_catalog.english'), name='message_content_search_idx'),
-            BrinIndex(fields=['timestamp'], name='message_timestamp_brin_idx'),
-        ]
 
+class CallSession(models.Model):
+    room_id = models.CharField(max_length=255, unique=True)
+    caller = models.ForeignKey(User, related_name='initiated_calls', on_delete=models.CASCADE)
+    callee = models.ForeignKey(User, related_name='received_calls', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
 
-class Call(models.Model):
-    caller = models.ForeignKey(User, related_name='outgoing_calls', on_delete=models.CASCADE)
-    receiver = models.ForeignKey(User, related_name='incoming_calls', on_delete=models.CASCADE)
-    room = models.ForeignKey(Room, on_delete=models.CASCADE)
-    start_time = models.DateTimeField(auto_now_add=True)
-    end_time = models.DateTimeField(null=True, blank=True, db_index=True)
-    is_active = models.BooleanField(default=True, db_index=True)
-
-    class Meta:
-        indexes = [
-            BrinIndex(fields=['start_time'], name='call_start_time_brin_idx'),
-        ]
-
-    def end_call(self):
-        self.is_active = False
-        self.end_time = timezone.now()
-        self.save()
+    def __str__(self):
+        return f"Call {self.room_id} from {self.caller} to {self.callee}"
