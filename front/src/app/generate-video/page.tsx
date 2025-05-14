@@ -1,19 +1,48 @@
 'use client';
-import { useState } from 'react';
-import { csrfFetch } from '@/lib/csrf';
+import { useState, useEffect } from 'react';
+import { getCSRFToken } from '@/lib/csrf';
+
+interface VideoData {
+  id: number;
+  prompt: string;
+  finalVideo: string;
+  arrImages: string[];
+}
 
 export default function GenerateVideoPage() {
   const [prompt, setPrompt] = useState('');
-  const [videos, setVideos] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [videos, setVideos] = useState<VideoData[]>([]);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    const fetchVideos = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/ai/generate/', {
+          credentials: 'include',
+        });
+        const data = await response.json();
+        setVideos(data);
+      } catch (error) {
+        console.error('Error fetching videos:', error);
+      }
+    };
+    
+    fetchVideos();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
     try {
-      const response = await csrfFetch('/api/ai/generate/', {
+      const response = await fetch('http://localhost:8000/ai/generate/', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': await getCSRFToken(),
+        },
+        credentials: 'include',
         body: JSON.stringify({ prompt }),
       });
       
@@ -62,62 +91,83 @@ export default function GenerateVideoPage() {
           </button>
         </form>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 mt-8">
           {videos.map((video) => (
-            <VideoItem key={video.id} video={video} />
+            <div key={video.id} className="bg-white rounded-xl shadow-lg overflow-hidden">
+              <div className="p-6">
+                <h3 className="text-xl font-semibold text-violet-800 mb-4">Prompt: {video.prompt}</h3>
+                
+                <div className="mb-6">
+                  <video controls className="w-full rounded-lg aspect-video">
+                    <source src={video.finalVideo} type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
+                  <a 
+                    href={video.finalVideo} 
+                    download="GeneratedVideo.mp4"
+                    className="mt-3 inline-flex items-center justify-center px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors duration-200"
+                  >
+                    Download Video
+                  </a>
+                </div>
+
+                <div className="relative group">
+                  <div className="flex overflow-hidden rounded-xl aspect-square bg-gray-100">
+                    {video.arrImages.map((image, index) => (
+                      <img
+                        key={index}
+                        src={image}
+                        className={`w-full h-full object-cover transition-transform duration-500 ${
+                          index === activeIndex ? 'translate-x-0' : 'translate-x-full absolute'
+                        }`}
+                        alt={`Generated content ${index + 1}`}
+                      />
+                    ))}
+                  </div>
+                  
+                  {/* Navigation Arrows */}
+                  {video.arrImages.length > 1 && (
+                    <>
+                      <button
+                        onClick={() => setActiveIndex(prev => (prev - 1 + video.arrImages.length) % video.arrImages.length)}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        <svg className="w-6 h-6 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => setActiveIndex(prev => (prev + 1) % video.arrImages.length)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        <svg className="w-6 h-6 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </>
+                  )}
+
+                  {/* Dots Indicator */}
+                  {video.arrImages.length > 1 && (
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2">
+                      {video.arrImages.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setActiveIndex(index)}
+                          className={`w-3 h-3 rounded-full transition-all ${
+                            index === activeIndex ? 'bg-violet-600 scale-125' : 'bg-white/80 scale-100'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       </main>
     </div>
   );
 }
-
-const VideoItem = ({ video }: { video: any }) => (
-  <div className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
-    <div className="p-4">
-      <h5 className="text-lg font-semibold text-violet-900 mb-2">{video.prompt}</h5>
-      
-      <div className="video-player mb-3 rounded-lg overflow-hidden">
-        <video controls className="w-full aspect-video bg-gray-100">
-          <source src={video.finalVideo} type="video/mp4" />
-        </video>
-      </div>
-
-      <a 
-        href={video.finalVideo} 
-        download
-        className="inline-block w-full bg-violet-100 hover:bg-violet-200 text-violet-800 text-center font-medium py-2 px-4 rounded-lg mb-3 transition-colors"
-      >
-        Download Video
-      </a>
-
-      <ImageCarousel images={video.arrImages} />
-    </div>
-  </div>
-);
-
-const ImageCarousel = ({ images }: { images: string[] }) => (
-  <div id={`carousel-${images[0]}`} className="carousel slide">
-    <div className="carousel-inner rounded-lg overflow-hidden">
-      {images.map((img, index) => (
-        <div 
-          key={img} 
-          className={`carousel-item ${index === 0 ? 'active' : ''}`}
-        >
-          <img 
-            src={img} 
-            className="d-block w-full aspect-square object-cover" 
-            alt="Generated frame" 
-          />
-        </div>
-      ))}
-    </div>
-    <button className="carousel-control-prev hover:bg-violet-100/30" type="button" data-bs-target={`#carousel-${images[0]}`} data-bs-slide="prev">
-      <span className="carousel-control-prev-icon !bg-violet-600" aria-hidden="true" />
-    </button>
-    <button className="carousel-control-next hover:bg-violet-100/30" type="button" data-bs-target={`#carousel-${images[0]}`} data-bs-slide="next">
-      <span className="carousel-control-next-icon !bg-violet-600" aria-hidden="true" />
-    </button>
-  </div>
-);
 

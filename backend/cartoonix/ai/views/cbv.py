@@ -1,30 +1,31 @@
+import base64
 import logging
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
+import os
+import uuid
+
+from ai.gpt import (generate_images_from_descriptions,
+                    generate_photo_descriptions)
 from ai.models import VideoPrompt
-from ai.gpt import generate_photo_descriptions, generate_images_from_descriptions
+from ai.nvidia import generate_video_from_images_with_nvidia
 from ai.s3_utils import upload_image_to_s3, upload_video_to_s3
 from ai.serializers import VideoPromptSerializer
-from ai.nvidia import generate_video_from_images_with_nvidia
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from django.shortcuts import render
-import base64
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from moviepy import VideoFileClip, concatenate_videoclips
-import uuid
-import os
-from rest_framework.permissions import IsAuthenticated, DjangoModelPermissions
+from rest_framework import status
+from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 logger = logging.getLogger('api_logger')
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class GenerateVideo(APIView):
     permission_classes = [IsAuthenticated, DjangoModelPermissions]
     
     def get_queryset(self):
         return VideoPrompt.objects.all()
-        
+
     @swagger_auto_schema(
         operation_summary="Generate video from user prompt",
         operation_description="This endpoint generates a video based on the given user prompt.",
@@ -125,11 +126,10 @@ class GenerateVideo(APIView):
         }
     )
     def get(self, request):
-        logger.info("GET request to GenerateVideo endpoint.")
         generatedVideos = VideoPrompt.objects.all()
         serializer = VideoPromptSerializer(generatedVideos, many=True)
-        return render(request, 'ai/video_list.html', {'videos': serializer.data})
-
+        return Response(serializer.data)
+        
 
 class VideoDetail(APIView):
     permission_classes = [IsAuthenticated, DjangoModelPermissions]
