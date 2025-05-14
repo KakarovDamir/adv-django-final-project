@@ -202,13 +202,25 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
 
 
 class FriendRequestSerializer(serializers.ModelSerializer):
-    from_user = ProfileSerializer(source='from_user.profile', read_only=True)
-    to_user = ProfileSerializer(source='to_user.profile', read_only=True)
+    from_user = serializers.SerializerMethodField()
+    to_user = serializers.SerializerMethodField()
     
     class Meta:
         model = FriendRequest
         fields = ['id', 'from_user', 'to_user', 'created_at']
         read_only_fields = ['id', 'created_at']
+
+    def get_from_user(self, obj):
+        return {
+            'id': obj.from_user.id,
+            'username': obj.from_user.username
+        }
+
+    def get_to_user(self, obj):
+        return {
+            'id': obj.to_user.id,
+            'username': obj.to_user.username
+        }
 
 class FriendSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()

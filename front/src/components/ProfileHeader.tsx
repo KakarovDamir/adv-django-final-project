@@ -112,21 +112,18 @@ export default function ProfileHeader({ username }: { username: string }) {
 
   const handleFriendRequest = async () => {
     try {
-      const response = await fetch(
-        `http://localhost:8000/social_network/send_friend_request/${profile?.user.id}/`, 
+      await fetch(
+        `http://localhost:8000/social_network/friends/requests/send/${profile?.user.id}/`,
         {
-          method: 'POST',
+          method: "POST",
+          credentials: "include",
           headers: {
-            'X-CSRFToken': getCookie('csrftoken') || '',
-            'Content-Type': 'application/json'
+            "X-CSRFToken":
+              document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "",
+            "Content-Type": "application/json",
           },
-          credentials: 'include'
         }
       );
-
-      if (response.ok) {
-        alert('Friend request sent!');
-      }
     } catch (error) {
       console.error('Error sending friend request:', error);
     }

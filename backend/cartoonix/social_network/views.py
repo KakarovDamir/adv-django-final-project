@@ -181,20 +181,21 @@ def profile_delete(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def send_friend_request(request, profile_id):
-    to_profile = get_object_or_404(Profile, pk=profile_id)
+def send_friend_request(request, user_id):
+    to_user = get_object_or_404(get_user_model(), pk=user_id)
 
-    if request.user.profile == to_profile:
+    if request.user == to_user:
         return Response({'error': 'Cannot send request to yourself'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if FriendRequest.objects.filter(from_user=request.user, to_user=to_profile.user).exists():
+    if FriendRequest.objects.filter(from_user=request.user, to_user=to_user).exists():
         return Response({'error': 'Request already sent'}, status=status.HTTP_400_BAD_REQUEST)
 
     friend_request = FriendRequest.objects.create(
         from_user=request.user,
-        to_user=to_profile.user
+        to_user=to_user
     )
-    return Response({'message': 'Friend request sent'}, status=status.HTTP_201_CREATED)
+    serializer = FriendRequestSerializer(friend_request)
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

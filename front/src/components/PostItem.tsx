@@ -82,14 +82,21 @@ export default function PostItem({ post }: { post: any }) {
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3">
             {post.author?.avatar && (
-              <img
-                src={post.author.avatar}
-                alt={`${post.author.username}'s avatar`}
-                className="w-10 h-10 rounded-full object-cover border-2 border-violet-200"
-              />
+              <Link href={`/profile/${post.author.username}`}>
+                <img
+                  src={post.author.avatar}
+                  alt={`${post.author.username}'s avatar`}
+                  className="w-10 h-10 rounded-full object-cover border-2 border-violet-200 hover:border-violet-300 transition-colors cursor-pointer"
+                />
+              </Link>
             )}
             <div>
-              <h3 className="font-semibold text-violet-800">{post.author?.username || 'Anonymous'}</h3>
+              <Link 
+                href={`/profile/${post.author?.username}`}
+                className="font-semibold text-violet-800 hover:text-violet-900 transition-colors"
+              >
+                {post.author?.username || 'Anonymous'}
+              </Link>
               <p className="text-sm text-violet-500">{new Date(post.created_at).toLocaleDateString()}</p>
             </div>
           </div>
@@ -136,7 +143,12 @@ export default function PostItem({ post }: { post: any }) {
                 className="p-3 bg-violet-50 rounded-lg border border-violet-100"
               >
                 <p className="text-violet-700">{comment.content}</p>
-                <p className="text-violet-500 text-sm mt-1">— {comment.author.username}</p>
+                <Link
+                  href={`/profile/${comment.author.username}`}
+                  className="text-violet-500 text-sm mt-1 hover:text-violet-600 transition-colors"
+                >
+                  — {comment.author.username}
+                </Link>
               </li>
             ))}
           </ul>

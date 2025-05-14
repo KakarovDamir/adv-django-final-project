@@ -11,6 +11,7 @@ interface ProfileData {
   bio?: string;
   friends_count: number;
   posts_count: number;
+  friendship_status: 'friends' | 'request_sent' | 'none';
   is_friend: boolean;
 }
 
@@ -80,6 +81,44 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     loadData();
   }, [username]);
 
+  const handleFollow = async () => {
+    try {
+      let url: string;
+      let method: 'POST' | 'DELETE' = 'POST';
+      
+      if (profile?.friendship_status === 'friends') {
+        url = `http://localhost:8000/social_network/friends/remove/${profile.id}/`;
+      } else if (profile?.friendship_status === 'request_sent') {
+        url = `http://localhost:8000/social_network/friends/requests/cancel/${profile.id}/`;
+        method = 'DELETE';
+      } else {
+        url = `http://localhost:8000/social_network/friends/requests/send/${profile?.id}/`;
+      }
+
+      const csrfToken = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken,
+        },
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        // Обновляем статус после успешного запроса
+        setProfile(prev => prev ? {
+          ...prev,
+          is_friend: !prev.is_friend,
+          friends_count: prev.is_friend ? prev.friends_count - 1 : prev.friends_count + 1
+        } : null);
+      }
+    } catch (error) {
+      console.error('Error updating friend status:', error);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-violet-50 flex items-center justify-center">
@@ -133,17 +172,16 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
             <div className="flex items-center gap-4 mb-4">
               <h1 className="text-2xl font-light text-black">{profile?.username}</h1>
               {currentUser && currentUser.username !== username && (
-                <>
-                  {profile?.is_friend ? (
-                    <button className="px-4 py-1 bg-gray-100 rounded-md text-sm font-medium">
-                      Friends
-                    </button>
-                  ) : (
-                    <button className="px-4 py-1 bg-blue-500 text-white rounded-md text-sm font-medium">
-                      Follow
-                    </button>
-                  )}
-                </>
+                <button 
+                  onClick={handleFollow}
+                  className={`px-4 py-1 rounded-md text-sm font-medium transition-colors ${
+                    profile?.is_friend 
+                      ? 'bg-gray-100 hover:bg-gray-200'
+                      : 'bg-blue-500 text-gray-100 hover:bg-blue-600'
+                  }`}
+                >
+                  {profile?.is_friend ? 'Friends' : 'Follow'}
+                </button>
               )}
             </div>
 

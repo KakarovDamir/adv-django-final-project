@@ -55,10 +55,10 @@ export default function FriendList() {
     }
   };
 
-  const handleAddFriend = async (profileId: number) => {
+  const handleAddFriend = async (userId: number) => {
     try {
       await fetch(
-        `http://localhost:8000/social_network/friends/requests/send/${profileId}/`,
+        `http://localhost:8000/social_network/friends/requests/send/${userId}/`,
         {
           method: "POST",
           credentials: "include",
@@ -70,7 +70,7 @@ export default function FriendList() {
         }
       );
       setFriends(friends.map(friend => 
-        friend.id === profileId ? {...friend, is_friend: true} : friend
+        friend.id === userId ? {...friend, is_friend: true} : friend
       ));
     } catch (error) {
       console.error("Failed to add friend:", error);

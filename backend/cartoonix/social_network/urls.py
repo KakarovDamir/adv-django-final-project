@@ -35,7 +35,7 @@ urlpatterns = [
     # Friends
     path('friends/', friend_list, name='friend-list'),
     path('friends/requests/', friend_request_list, name='friend-request-list'),
-    path('friends/requests/send/<int:profile_id>/', send_friend_request, name='send-friend-request'),
+    path('friends/requests/send/<int:user_id>/', send_friend_request, name='send-friend-request'),
     path('friends/requests/accept/<int:request_id>/', accept_friend_request, name='accept-friend-request'),
     path('friends/requests/reject/<int:request_id>/', reject_friend_request, name='reject-friend-request'),
     path('friends/remove/<int:profile_id>/', remove_friend, name='remove_friend'),
