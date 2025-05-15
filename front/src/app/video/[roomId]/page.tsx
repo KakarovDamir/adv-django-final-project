@@ -24,43 +24,69 @@ export default function VideoCallPage() {
   useEffect(() => {
     // Check if we're in the browser environment
     if (typeof window !== "undefined" && navigator.mediaDevices) {
+      console.log("🎥 Attempting to get camera access");
       navigator.mediaDevices
         .getUserMedia({ video: true, audio: true })
         .then((localStream) => {
-          console.log("🎥 Камера получена");
+          console.log("🎥 Camera access granted");
           setStream(localStream);
           if (userVideo.current && !userVideo.current.srcObject) {
             userVideo.current.srcObject = localStream;
           }
         })
         .catch((err) => {
-          console.error("🚫 Ошибка доступа к камере:", err);
+          console.error("🚫 Camera access error:", err);
           alert("Ошибка доступа к камере.");
         });
+    } else {
+      console.warn("⚠️ Not in browser or mediaDevices not available");
     }
   }, []);
 
   // 2. Подключаем WebSocket и Peer когда stream готов
   useEffect(() => {
-    if (!roomId || !stream || typeof window === "undefined") return;
+    console.log(
+      "🔄 WebSocket effect triggered with roomId:",
+      roomId,
+      "stream:",
+      !!stream
+    );
 
+    if (!roomId || typeof window === "undefined") {
+      console.warn("⚠️ Missing roomId or not in browser environment");
+      return;
+    }
+
+    // Initialize WebSocket even without stream to test connection
     // Try different WebSocket URL formats
     const wsUrl = `ws://138.68.87.67:8000/ws/call/${roomId}/`;
     console.log("🔌 Connecting to WebSocket:", wsUrl);
     setConnectionStatus("Connecting to WebSocket...");
 
     // Create the WebSocket connection
-    socketRef.current = new WebSocket(wsUrl) as CustomWebSocket;
+    try {
+      socketRef.current = new WebSocket(wsUrl) as CustomWebSocket;
+      console.log("📡 WebSocket instance created");
+    } catch (err) {
+      console.error("🚫 Failed to create WebSocket:", err);
+      return;
+    }
 
     socketRef.current.onopen = () => {
-      console.log("✅ WebSocket подключен");
+      console.log("✅ WebSocket connected successfully");
       setConnectionStatus("WebSocket connected");
 
-      // Send join message to let server know we're here
-      if (
-        socketRef.current &&
-        socketRef.current.readyState === WebSocket.OPEN
-      ) {
+      // Send a test message to verify connection
+      if (socketRef.current?.readyState === WebSocket.OPEN) {
+        console.log("📤 Sending test message");
+        socketRef.current.send(
+          JSON.stringify({
+            type: "chat",
+            message: "Hello world",
+          })
+        );
+
+        // Send join message to let server know we're here
         const userId = `user-${Math.floor(Math.random() * 1000000)}`;
         // Store our own user ID to help determine initiator role later
         socketRef.current._mySelfId = userId;
@@ -71,11 +97,17 @@ export default function VideoCallPage() {
             userId: userId,
           })
         );
+        console.log("📤 Join message sent with userId:", userId);
       }
     };
 
+    socketRef.current.onclose = (event) => {
+      console.log("❌ WebSocket connection closed:", event.code, event.reason);
+      setConnectionStatus(`Connection closed: ${event.code}`);
+    };
+
     socketRef.current.onerror = (err) => {
-      console.error("❌ WebSocket ошибка:", err);
+      console.error("❌ WebSocket error:", err);
       setConnectionStatus(
         "WebSocket connection failed. Trying alternative connection..."
       );
@@ -131,6 +163,7 @@ export default function VideoCallPage() {
               userId: userId,
             })
           );
+          console.log("📤 Join message sent with userId:", userId);
         }
       };
 
@@ -146,17 +179,21 @@ export default function VideoCallPage() {
 
     // Setup message handler function
     const setupMessageHandler = () => {
-      if (!socketRef.current) return;
+      if (!socketRef.current) {
+        console.error("❌ Cannot set up message handler: socketRef is null");
+        return;
+      }
 
       socketRef.current.onmessage = (event) => {
+        console.log("📩 Raw message received:", event.data);
         try {
           const data = JSON.parse(event.data);
-          console.log("📩 Получено сообщение:", data);
+          console.log("📩 Parsed message:", data);
           const signal = data.data;
 
           // Handle room status message to initialize connections with other users
           if (signal?.type === "room_status") {
-            console.log("🏠 Получен статус комнаты:", signal.users);
+            console.log("🏠 Room status received:", signal.users);
             setConnectionStatus(
               `Room joined with ${signal.users.length} users`
             );
@@ -194,7 +231,7 @@ export default function VideoCallPage() {
 
             // Only initialize a new peer connection if we don't have one
             // or if this is the first time seeing another user
-            if (!peerRef.current && otherUsers.length > 0) {
+            if (stream && !peerRef.current && otherUsers.length > 0) {
               // We'll always make the user with the lower numeric ID the initiator
               // This ensures consistent role assignments
               const shouldBeInitiator =
@@ -210,19 +247,29 @@ export default function VideoCallPage() {
                 }`
               );
               initializePeerConnection(shouldBeInitiator);
+            } else if (!stream && otherUsers.length > 0) {
+              console.warn(
+                "⚠️ Cannot initialize peer: stream not available yet"
+              );
             }
           }
 
           // Handle other message types
           if (signal?.type === "offer") {
-            handleOfferSignal(signal);
+            if (stream) {
+              console.log("📞 Offer received, handling");
+              handleOfferSignal(signal);
+            } else {
+              console.warn("⚠️ Offer received but stream not ready");
+            }
           }
 
           if (signal?.type === "answer") {
+            console.log("📞 Answer received, handling");
             handleAnswerSignal(signal);
           }
         } catch (error) {
-          console.error("❌ Ошибка при обработке сообщения:", error);
+          console.error("❌ Error processing message:", error);
         }
       };
     };
@@ -236,6 +283,12 @@ export default function VideoCallPage() {
 
       if (!peerRef.current) {
         console.log("🔄 Создаем peer connection для ответа на offer");
+
+        // Ensure stream is available
+        if (!stream) {
+          console.error("🚫 Cannot create peer: stream is null");
+          return;
+        }
 
         // Initialize peer as non-initiator since we're answering
         const peer = new Peer({
@@ -329,6 +382,12 @@ export default function VideoCallPage() {
           if (partnerVideo.current && partnerVideo.current.srcObject) {
             partnerVideo.current.srcObject = null;
           }
+        }
+
+        // Ensure stream is available
+        if (!stream) {
+          console.error("🚫 Cannot create peer: stream is null");
+          return;
         }
 
         const peer = new Peer({
@@ -471,7 +530,7 @@ export default function VideoCallPage() {
     };
 
     return () => {
-      console.log("🧹 Отключаем WebSocket и Peer");
+      console.log("🧹 Cleaning up WebSocket and Peer");
       if (socketRef.current) {
         socketRef.current.close();
       }
@@ -480,12 +539,37 @@ export default function VideoCallPage() {
         peerRef.current = null;
       }
     };
-  }, [roomId, stream]);
+  }, [roomId]); // Remove stream dependency to initialize WebSocket immediately
+
+  // Add a button to manually send a test message
+  const sendTestMessage = () => {
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      console.log("📤 Sending manual test message");
+      socketRef.current.send(
+        JSON.stringify({
+          type: "chat",
+          message: "Manual test message",
+        })
+      );
+    } else {
+      console.warn("⚠️ WebSocket not ready for sending test message");
+      alert("WebSocket not connected");
+    }
+  };
 
   return (
     <div className="flex flex-col items-center justify-center h-screen gap-4 bg-gray-100">
       <div className="text-2xl font-semibold">Room: {roomId}</div>
       <div className="text-sm text-gray-500 mb-2">{connectionStatus}</div>
+
+      {/* Add test button */}
+      <button
+        onClick={sendTestMessage}
+        className="mb-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+      >
+        Send Test Message
+      </button>
+
       <div className="flex flex-wrap justify-center gap-8 w-full max-w-4xl">
         <div className="flex flex-col items-center border-2 border-blue-400 rounded-lg p-2 bg-white shadow-md">
           <p className="text-center font-medium text-blue-600 mb-1">You</p>
