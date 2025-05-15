@@ -44,35 +44,9 @@ export default function VideoCallPage() {
   useEffect(() => {
     if (!roomId || !stream || typeof window === "undefined") return;
 
-    // Determine WebSocket connection options
-    let wsUrl = "";
-    const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-    const ngrokPattern = /ngrok(-free)?\.app|ngrok\.io/;
-    const isNgrok = ngrokPattern.test(window.location.hostname);
-
-    // Handle connection based on environment
-    if (isNgrok) {
-      // If frontend is on ngrok but backend is local, always use localhost for backend
-      wsUrl = "ws://138.68.87.67:8000/ws/call/" + roomId + "/";
-      console.log("🔌 Ngrok frontend detected, connecting to local backend");
-    } else if (
-      window.location.hostname === "138.68.87.67" ||
-      window.location.hostname === "127.0.0.1"
-    ) {
-      // For local development
-      wsUrl = `${protocol}${window.location.hostname}:8000/ws/call/${roomId}/`;
-      console.log("🔌 Local development WebSocket");
-    } else if (process.env.NEXT_PUBLIC_BACKEND_URL) {
-      // If NEXT_PUBLIC_BACKEND_URL is set and we're not on localhost
-      wsUrl = `${protocol}${process.env.NEXT_PUBLIC_BACKEND_URL}/ws/call/${roomId}/`;
-      console.log("🔌 Environment-configured WebSocket");
-    } else {
-      // Fallback to same host but with ws protocol
-      wsUrl = `${protocol}${window.location.host}/ws/call/${roomId}/`;
-      console.log("🔌 Same-host fallback WebSocket");
-    }
-
-    console.log("🔥 Подключаем WebSocket по URL:", wsUrl);
+    // Use only the specified WebSocket URL
+    const wsUrl = `ws://138.68.87.67:8000/ws/call/${roomId}/`;
+    console.log("🔌 Connecting to WebSocket:", wsUrl);
     setConnectionStatus("Connecting to WebSocket...");
 
     // Create the WebSocket connection
@@ -103,45 +77,6 @@ export default function VideoCallPage() {
     socketRef.current.onerror = (err) => {
       console.error("❌ WebSocket ошибка:", err);
       setConnectionStatus("WebSocket connection failed");
-
-      // If first attempt fails, try localhost as a fallback
-      const localhostUrl = `ws://138.68.87.67:8000/ws/call/${roomId}/`;
-      console.log("🔄 Последняя попытка через localhost:", localhostUrl);
-      setConnectionStatus("Trying localhost connection...");
-
-      // Close existing socket first
-      if (socketRef.current) {
-        socketRef.current.close();
-      }
-
-      socketRef.current = new WebSocket(localhostUrl) as CustomWebSocket;
-
-      socketRef.current.onopen = () => {
-        console.log("✅ Localhost WebSocket подключен");
-        setConnectionStatus("Localhost WebSocket connected");
-
-        // Send join message after connection
-        if (
-          socketRef.current &&
-          socketRef.current.readyState === WebSocket.OPEN
-        ) {
-          const userId = `user-${Math.floor(Math.random() * 1000000)}`;
-          // Store our own user ID to help determine initiator role later
-          socketRef.current._mySelfId = userId;
-
-          socketRef.current.send(
-            JSON.stringify({
-              type: "join",
-              userId: userId,
-            })
-          );
-        }
-      };
-
-      socketRef.current.onerror = (innerErr) => {
-        console.error("❌ Все попытки подключения провалились");
-        setConnectionStatus("All connection attempts failed");
-      };
     };
 
     socketRef.current.onmessage = (event) => {
