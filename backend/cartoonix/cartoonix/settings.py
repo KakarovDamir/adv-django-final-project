@@ -57,7 +57,9 @@ INSTALLED_APPS = [
     'channels',
     'drf_yasg',
     'videochat',
-    'django_celery_beat'
+    'django_celery_beat',
+    'payments',
+    'dotenv',
 ]
 
 MIDDLEWARE = [
@@ -335,3 +337,9 @@ SWAGGER_SETTINGS = {
         'rest_framework.renderers.JSONRenderer',
     ],
 }
+
+STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY')
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY')
+STRIPE_PRICE_AMOUNT = int(os.environ.get('STRIPE_PRICE_AMOUNT', '500'))
+
+BACKEND_DOMAIN_URL = os.environ.get('BACKEND_DOMAIN_URL', 'http://localhost:8000')
