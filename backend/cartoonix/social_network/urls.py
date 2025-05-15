@@ -14,6 +14,7 @@ urlpatterns = [
     # Auth
     path('auth/current_user/', current_user, name='current-user'),
     path('auth/login/', api_login),
+    path('auth/csrf/', get_csrf, name='csrf-token'),
     path('get_csrf/', get_csrf),
     path('auth/logout/', api_logout, name='api-logout'),
     path('auth/register/', api_register, name='api-register'),

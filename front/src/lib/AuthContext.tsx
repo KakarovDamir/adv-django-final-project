@@ -43,6 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log("Auth check:", {
         hasUserData: !!userData,
         hasToken: !!token,
+        tokenPreview: token ? `${token.substring(0, 5)}...` : "none",
         csrfToken:
           typeof document !== "undefined"
             ? document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "No CSRF token"
@@ -53,6 +54,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // We have user data, but let's validate it's still valid
         try {
           // Try to fetch current user from API to verify session is still valid
+          console.log("Validating authentication with API...");
           const res = await fetch(
             "http://138.68.87.67:8000/social_network/auth/current_user/",
             {
@@ -67,23 +69,74 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
           );
 
+          console.log("Auth validation response:", res.status);
+
           if (res.ok) {
             const currentUser = await res.json();
+            console.log("Authentication validated successfully");
             setUser(currentUser);
             return true;
           } else {
             // Session expired or invalid
-            console.warn("Session invalid, redirecting to login");
+            console.warn("Session invalid, attempting to refresh token");
+
+            // Try to refresh CSRF token
+            try {
+              const csrfRes = await fetch(
+                "http://138.68.87.67:8000/social_network/auth/csrf/",
+                {
+                  credentials: "include",
+                }
+              );
+
+              if (csrfRes.ok) {
+                console.log("CSRF token refreshed");
+
+                // Try auth validation again with fresh CSRF
+                const retryRes = await fetch(
+                  "http://138.68.87.67:8000/social_network/auth/current_user/",
+                  {
+                    credentials: "include",
+                    headers: {
+                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                      "X-CSRFToken":
+                        typeof document !== "undefined"
+                          ? document.cookie.match(/csrftoken=([^;]+)/)?.[1] ||
+                            ""
+                          : "",
+                    },
+                  }
+                );
+
+                if (retryRes.ok) {
+                  const retryUser = await retryRes.json();
+                  console.log("Authentication validated on retry");
+                  setUser(retryUser);
+                  return true;
+                }
+              }
+            } catch (refreshError) {
+              console.error("CSRF refresh failed:", refreshError);
+            }
+
             throw new Error("Session expired");
           }
         } catch (apiError) {
           console.error("API validation error:", apiError);
           // If API validation fails, try to use stored user data
-          setUser(JSON.parse(userData));
-          return true;
+          try {
+            const parsedUser = JSON.parse(userData);
+            console.log("Using cached user data:", parsedUser.username);
+            setUser(parsedUser);
+            return true;
+          } catch (parseError) {
+            console.error("Failed to parse stored user data:", parseError);
+            throw new Error("Invalid user data");
+          }
         }
       } else {
         // No user data, redirect to login
+        console.warn("No user data found in localStorage");
         throw new Error("No user data");
       }
     } catch (error) {
@@ -104,25 +157,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (typeof window !== "undefined") {
       checkAuth();
     }
-  }, [router]);
+  }, []);
 
   const refreshAuth = async (): Promise<boolean> => {
+    console.log("Refreshing authentication...");
     return await checkAuth();
   };
 
   const logout = async () => {
     try {
+      const token = localStorage.getItem("token");
       // Call logout API
       await fetch("http://138.68.87.67:8000/social_network/auth/logout/", {
         method: "POST",
         credentials: "include",
         headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
           "X-CSRFToken":
             typeof document !== "undefined"
               ? document.cookie.match(/csrftoken=([^;]+)/)?.[1] || ""
               : "",
         },
       });
+      console.log("Logout API call successful");
     } catch (error) {
       console.error("Logout API error:", error);
     } finally {
@@ -130,6 +187,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem("user");
       localStorage.removeItem("token");
       setUser(null);
+      console.log("Local auth data cleared, redirecting to login");
       router.replace("/login");
     }
   };

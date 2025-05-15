@@ -11,13 +11,34 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError("");
     const formData = new FormData(e.currentTarget as HTMLFormElement);
 
     try {
+      console.log("Starting login process...");
+
       // Get CSRF token first
-      await fetch("http://138.68.87.67:8000/social_network/auth/csrf/", {
-        credentials: "include",
-      });
+      const csrfResponse = await fetch(
+        "http://138.68.87.67:8000/social_network/auth/csrf/",
+        {
+          credentials: "include",
+        }
+      );
+
+      if (!csrfResponse.ok) {
+        console.error("Failed to get CSRF token:", csrfResponse.status);
+      } else {
+        console.log("CSRF token fetched successfully");
+      }
+
+      // Get CSRF token from cookies
+      const csrfToken =
+        document.cookie
+          .split("; ")
+          .find((row) => row.startsWith("csrftoken="))
+          ?.split("=")[1] || "";
+
+      console.log("CSRF token available:", !!csrfToken);
 
       const res = await fetch(
         "http://138.68.87.67:8000/social_network/auth/login/",
@@ -25,8 +46,7 @@ export default function LoginPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-CSRFToken":
-              document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "",
+            "X-CSRFToken": csrfToken,
           },
           body: JSON.stringify(Object.fromEntries(formData)),
           credentials: "include",
@@ -34,6 +54,10 @@ export default function LoginPage() {
       );
 
       const data = await res.json();
+      console.log("Login response:", {
+        status: res.status,
+        hasToken: !!data.token,
+      });
 
       if (res.ok) {
         // Store user data
@@ -42,16 +66,18 @@ export default function LoginPage() {
         // Store token if it exists in the response
         if (data.token) {
           localStorage.setItem("token", data.token);
+          console.log("Token stored successfully");
         } else {
-          // If no token in response, we might be using session auth only
-          console.log("No token in response, using session authentication");
+          console.warn(
+            "No token in response, using session authentication only"
+          );
         }
 
-        console.log("Login successful:", {
-          user: data.user,
+        // Debug authentication info
+        console.log("Authentication info:", {
+          user: data.user?.username,
           hasToken: !!data.token,
-          csrfToken:
-            document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "No CSRF token",
+          csrfToken: csrfToken ? "Available" : "Not available",
         });
 
         router.push("/home");

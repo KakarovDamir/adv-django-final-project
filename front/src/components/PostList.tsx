@@ -23,6 +23,12 @@ export default function PostList() {
   const loadMore = async () => {
     setLoading(true);
     try {
+      console.log(`Fetching posts page ${page}...`);
+
+      // Check if we have a token
+      const token = localStorage.getItem("token");
+      console.log("Auth token available:", !!token);
+
       const res = await csrfFetch(
         `http://138.68.87.67:8000/social_network/posts/?page=${page}`
       );
@@ -32,11 +38,18 @@ export default function PostList() {
         const errorMessage =
           errorData.detail || `HTTP error! status: ${res.status}`;
 
-        if (res.status === 403) {
-          console.error("Authentication error:", errorMessage);
+        console.error("Failed to fetch posts:", {
+          status: res.status,
+          error: errorMessage,
+          data: errorData,
+        });
+
+        if (res.status === 403 || res.status === 401) {
+          console.warn("Authentication error, attempting to refresh auth...");
 
           // Try to refresh the auth
           const refreshSuccess = await refreshAuth();
+          console.log("Auth refresh result:", refreshSuccess);
 
           if (refreshSuccess) {
             // Try the request again
@@ -45,8 +58,15 @@ export default function PostList() {
               `http://138.68.87.67:8000/social_network/posts/?page=${page}`
             );
 
+            console.log("Retry response status:", retriedRes.status);
+
             if (retriedRes.ok) {
               const data = await retriedRes.json();
+              console.log(
+                "Retry successful, posts received:",
+                data.length || data.results?.length || 0
+              );
+
               const receivedPosts = data.results ? data.results : data;
               const hasMore = data.next ? data.next !== null : false;
 
@@ -56,10 +76,15 @@ export default function PostList() {
               setError(null);
               setLoading(false);
               return;
+            } else {
+              console.error("Retry failed with status:", retriedRes.status);
             }
           }
 
           // If refresh didn't work or retry failed, redirect to login
+          console.warn(
+            "Authentication failed after refresh, redirecting to login"
+          );
           if (typeof window !== "undefined") {
             window.location.href = "/login";
             return;
@@ -70,6 +95,10 @@ export default function PostList() {
       }
 
       const data = await res.json();
+      console.log(
+        "Posts fetched successfully:",
+        data.length || data.results?.length || 0
+      );
 
       // Check data structure
       const receivedPosts = data.results ? data.results : data;

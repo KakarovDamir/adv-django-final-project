@@ -1,24 +1,26 @@
 from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.contrib.auth.models import User
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
-from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from django.views.decorators.cache import cache_page
+from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from rest_framework import status
 from rest_framework.authentication import (SessionAuthentication,
                                            TokenAuthentication)
+from rest_framework.authtoken.models import Token
 from rest_framework.decorators import (api_view, authentication_classes,
                                        permission_classes)
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from .models import Comment, FriendRequest, Notification, Post, Profile
+from .permissions import CanEditOrDeletePost, CanManageComment
 from .serializers import (CommentSerializer, FriendRequestSerializer,
                           NotificationSerializer, PostSerializer,
                           ProfileSerializer, ProfileUpdateSerializer,
                           RegisterSerializer, UserSerializer)
-from django.contrib.auth.models import User
-from .permissions import CanEditOrDeletePost, CanManageComment
+
 
 @ensure_csrf_cookie
 def get_csrf(request):
@@ -34,8 +36,11 @@ def api_login(request):
 
     if user is not None:
         login(request, user)
+        # Create or get token for the user
+        token, created = Token.objects.get_or_create(user=user)
         return Response({
             'user': UserSerializer(user).data,
+            'token': token.key,
             'message': 'Login successful',
         }, status=status.HTTP_200_OK)
     return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
@@ -43,6 +48,9 @@ def api_login(request):
 
 @api_view(['POST'])
 def api_logout(request):
+    # Delete the user's token if it exists
+    if request.user.is_authenticated:
+        Token.objects.filter(user=request.user).delete()
     logout(request)
     return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
 
@@ -59,8 +67,11 @@ def api_register(request):
         )
         if user:
             login(request, user)
+            # Create token for the new user
+            token, created = Token.objects.get_or_create(user=user)
             return Response({
                 'user': UserSerializer(user).data,
+                'token': token.key,
                 'message': 'Registration successful'
             }, status=status.HTTP_201_CREATED)
     return Response({
@@ -70,6 +81,7 @@ def api_register(request):
 
 @cache_page(60 * 2)
 @api_view(['GET', 'POST'])
+@authentication_classes([SessionAuthentication, TokenAuthentication])
 @permission_classes([IsAuthenticated])
 def post_list_create(request):
     if request.method == 'GET':
@@ -325,7 +337,7 @@ def post_delete(request, pk):
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['GET'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([SessionAuthentication, TokenAuthentication])
 @permission_classes([IsAuthenticated])
 def current_user(request):
     serializer = UserSerializer(request.user)
