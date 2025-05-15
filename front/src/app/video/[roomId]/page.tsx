@@ -44,7 +44,7 @@ export default function VideoCallPage() {
   useEffect(() => {
     if (!roomId || !stream || typeof window === "undefined") return;
 
-    // Use only the specified WebSocket URL
+    // Use secure WebSocket URL with wss protocol
     const wsUrl = `ws://138.68.87.67:8000/ws/call/${roomId}/`;
     console.log("🔌 Connecting to WebSocket:", wsUrl);
     setConnectionStatus("Connecting to WebSocket...");
@@ -76,7 +76,47 @@ export default function VideoCallPage() {
 
     socketRef.current.onerror = (err) => {
       console.error("❌ WebSocket ошибка:", err);
-      setConnectionStatus("WebSocket connection failed");
+      setConnectionStatus(
+        "WebSocket connection failed. Trying alternative connection..."
+      );
+
+      // Try alternative connection with ws:// protocol as fallback
+      const alternativeUrl = `ws://138.68.87.67:8000/ws/call/${roomId}/`;
+      console.log(
+        "🔄 Trying alternative WebSocket connection:",
+        alternativeUrl
+      );
+
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+
+      socketRef.current = new WebSocket(alternativeUrl) as CustomWebSocket;
+
+      socketRef.current.onopen = () => {
+        console.log("✅ Alternative WebSocket connected");
+        setConnectionStatus("Alternative WebSocket connected");
+
+        if (
+          socketRef.current &&
+          socketRef.current.readyState === WebSocket.OPEN
+        ) {
+          const userId = `user-${Math.floor(Math.random() * 1000000)}`;
+          socketRef.current._mySelfId = userId;
+
+          socketRef.current.send(
+            JSON.stringify({
+              type: "join",
+              userId: userId,
+            })
+          );
+        }
+      };
+
+      socketRef.current.onerror = (innerErr) => {
+        console.error("❌ All WebSocket connection attempts failed:", innerErr);
+        setConnectionStatus("All WebSocket connection attempts failed");
+      };
     };
 
     socketRef.current.onmessage = (event) => {
