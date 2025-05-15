@@ -9,6 +9,7 @@ export default function PostList() {
   const [posts, setPosts] = useState<any[]>([]);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { ref, inView } = useInView();
 
   useEffect(() => {
@@ -25,7 +26,23 @@ export default function PostList() {
       );
 
       if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
+        const errorData = await res.json().catch(() => ({}));
+        const errorMessage =
+          errorData.detail || `HTTP error! status: ${res.status}`;
+
+        if (res.status === 403) {
+          console.error("Authentication error:", errorMessage);
+          // Try to refresh the token or redirect to login if needed
+          if (typeof window !== "undefined") {
+            const isLoggedIn = !!localStorage.getItem("token");
+            if (!isLoggedIn) {
+              window.location.href = "/login";
+              return;
+            }
+          }
+        }
+
+        throw new Error(errorMessage);
       }
 
       const data = await res.json();
@@ -37,8 +54,10 @@ export default function PostList() {
       setPosts((prev) => [...prev, ...receivedPosts]);
       setHasMore(hasMore);
       setPage((prev) => prev + 1);
+      setError(null);
     } catch (error) {
       console.error("Error loading posts:", error);
+      setError(error instanceof Error ? error.message : "Failed to load posts");
       setHasMore(false);
     } finally {
       setLoading(false);
@@ -47,6 +66,16 @@ export default function PostList() {
 
   return (
     <div className="max-w-xl mx-auto">
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg">
+          {error}
+        </div>
+      )}
+
+      {posts.length === 0 && !loading && !error && (
+        <div className="text-center text-gray-500 py-8">No posts found</div>
+      )}
+
       {posts.map((post) => (
         <PostItem post={post} key={post.id} />
       ))}
