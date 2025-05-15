@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 
 MASTER_HOST=${MASTER_HOST:-db} 

@@ -2,6 +2,8 @@ import base64
 import logging
 import os
 import uuid
+import urllib.request
+import tempfile
 
 from ai.gpt import (generate_images_from_descriptions,
                     generate_photo_descriptions)
@@ -15,7 +17,7 @@ from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from moviepy import VideoFileClip, concatenate_videoclips
 from rest_framework import status
-from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
+from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -23,7 +25,8 @@ logger = logging.getLogger('api_logger')
 
 @method_decorator(csrf_exempt, name='dispatch')
 class GenerateVideo(APIView):
-    permission_classes = [IsAuthenticated, DjangoModelPermissions]
+    authentication_classes = []
+    permission_classes = [AllowAny]
     
     def get_queryset(self):
         return VideoPrompt.objects.all()
@@ -86,16 +89,67 @@ class GenerateVideo(APIView):
             logger.info(f"Uploaded videos to S3: {s3_video_urls}")
 
             def merge_videos(video_urls):
-                output_file = f"{uuid.uuid4()}.mp4"
-                clips = [VideoFileClip(url) for url in video_urls]
-                final_clip = concatenate_videoclips(clips, method="compose")
-                final_clip.write_videofile(output_file, codec="libx264", audio_codec="aac")
-                for clip in clips:
-                    clip.close()
-                final_clip.close()
-                return output_file
+                local_video_paths = []
+                temp_files = []
+                try:
+                    for url in video_urls:
+                        # Create a temporary file to store the downloaded video
+                        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+                        temp_files.append(temp_file) # Keep track for cleanup
+                        
+                        logger.info(f"Downloading video from {url} to {temp_file.name}")
+                        with urllib.request.urlopen(url) as response, open(temp_file.name, 'wb') as out_file:
+                            data = response.read() # Read video data
+                            out_file.write(data)   # Write video data to temp file
+                        local_video_paths.append(temp_file.name)
+                        logger.info(f"Successfully downloaded {url} to {temp_file.name}")
+
+                    if not local_video_paths:
+                        logger.error("No local video paths obtained after download attempts.")
+                        return None # Or raise an exception
+
+                    output_file = f"{uuid.uuid4()}.mp4"
+                    logger.info(f"Creating clips from local paths: {local_video_paths}")
+                    clips = [VideoFileClip(path) for path in local_video_paths]
+                    
+                    logger.info("Concatenating video clips.")
+                    final_clip = concatenate_videoclips(clips, method="compose")
+                    
+                    logger.info(f"Writing final video to {output_file}")
+                    final_clip.write_videofile(output_file, codec="libx264", audio_codec="aac")
+                    
+                    for clip in clips:
+                        clip.close()
+                    final_clip.close()
+                    return output_file
+                except Exception as e:
+                    logger.error(f"Error in merge_videos: {str(e)}")
+                    # Optionally, re-raise the exception or return None/handle error
+                    raise # Re-raise the exception to be caught by the outer try-except
+                finally:
+                    # Clean up temporary files
+                    for temp_file_obj in temp_files:
+                        try:
+                            logger.info(f"Attempting to remove temporary file: {temp_file_obj.name}")
+                            os.remove(temp_file_obj.name)
+                            logger.info(f"Successfully removed temporary file: {temp_file_obj.name}")
+                        except OSError as e:
+                            logger.error(f"Error removing temporary file {temp_file_obj.name}: {e.strerror}")
+                    # Also clean up paths if they are different from temp_file_obj.name (though they shouldn't be here)
+                    # For safety, if local_video_paths could contain paths not in temp_files:
+                    for path in local_video_paths:
+                         if os.path.exists(path) and not any(tf.name == path for tf in temp_files):
+                            try:
+                                os.remove(path)
+                                logger.info(f"Successfully removed path (not in temp_files list): {path}")
+                            except OSError as e:
+                                logger.error(f"Error removing path {path}: {e.strerror}")
+
 
             merged_video = merge_videos(s3_video_urls)
+            if not merged_video: # Handle case where merge_videos might fail and return None
+                logger.error("Video merging failed, merged_video is None.")
+                return Response({'error': 'Video merging process failed'}, status=500)
 
             with open(merged_video, "rb") as f:
                 video_data = f.read()

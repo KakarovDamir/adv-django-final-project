@@ -324,6 +324,16 @@ CORS_ALLOW_HEADERS = [
 # Allow credentials for cross-origin requests
 CORS_ALLOW_CREDENTIALS = True
 
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:3000', # For local frontend development
+    # Add other trusted origins if needed, e.g., your production frontend URL
+    # 'https://your-production-frontend.com',
+    # If you use ngrok and its URL is dynamic but the domain is fixed, you might add:
+    # 'https://*.ngrok-free.app', # (Be cautious with wildcards)
+    # or more specifically if you know the current ngrok URL:
+    # 'https://your-current-ngrok-id.ngrok-free.app'
+]
+
 SWAGGER_SETTINGS = {
     'SECURITY_DEFINITIONS': {
         'Bearer': {
