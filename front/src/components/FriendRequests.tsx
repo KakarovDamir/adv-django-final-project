@@ -33,11 +33,11 @@ export default function FriendRequests({ onUpdate }: FriendRequestsProps) {
     fetch("http://138.68.87.67:8000/social_network/friends/requests/", {
       credentials: "include",
       headers: {
-        "Authorization": `Bearer ${localStorage.getItem('token')}`
+        Authorization: `Token ${localStorage.getItem("token")}`,
       },
     })
       .then((res) => res.json())
-      .then(data => {
+      .then((data) => {
         setRequests(data);
         onUpdate(data.received.length);
       });

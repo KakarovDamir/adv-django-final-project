@@ -19,7 +19,7 @@ export const getCSRFToken = () => {
     // Add Authorization header with the token from localStorage if it exists
     const token = localStorage.getItem('token');
     if (token) {
-      headers.set('Authorization', `Bearer ${token}`);
+      headers.set('Authorization', `Token ${token}`);
       console.log('Using token for authentication:', token.substring(0, 5) + '...');
     } else {
       console.log('No token found, falling back to session authentication');

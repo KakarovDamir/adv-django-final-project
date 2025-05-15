@@ -60,7 +60,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             {
               credentials: "include",
               headers: {
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                ...(token ? { Authorization: `Token ${token}` } : {}),
                 "X-CSRFToken":
                   typeof document !== "undefined"
                     ? document.cookie.match(/csrftoken=([^;]+)/)?.[1] || ""
@@ -98,7 +98,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   {
                     credentials: "include",
                     headers: {
-                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                      ...(token ? { Authorization: `Token ${token}` } : {}),
                       "X-CSRFToken":
                         typeof document !== "undefined"
                           ? document.cookie.match(/csrftoken=([^;]+)/)?.[1] ||
@@ -172,7 +172,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         method: "POST",
         credentials: "include",
         headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(token ? { Authorization: `Token ${token}` } : {}),
           "X-CSRFToken":
             typeof document !== "undefined"
               ? document.cookie.match(/csrftoken=([^;]+)/)?.[1] || ""

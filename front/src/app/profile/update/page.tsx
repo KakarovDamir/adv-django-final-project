@@ -30,7 +30,7 @@ export default function UpdateProfilePage() {
           "http://138.68.87.67:8000/social_network/profile/update/",
           {
             headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              Authorization: `Token ${localStorage.getItem("token")}`,
             },
             credentials: "include",
           }
@@ -72,7 +72,7 @@ export default function UpdateProfilePage() {
         {
           method: "PUT",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            Authorization: `Token ${localStorage.getItem("token")}`,
           },
           body: formData,
           credentials: "include",
