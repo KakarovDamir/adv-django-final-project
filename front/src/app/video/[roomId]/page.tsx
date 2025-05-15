@@ -19,29 +19,50 @@ export default function VideoCallPage() {
   const peerRef = useRef<Peer.Instance | null>(null);
   const [connectionStatus, setConnectionStatus] =
     useState<string>("Connecting...");
+  const [cameraStatus, setCameraStatus] = useState<string>(
+    "Waiting for camera access..."
+  );
+  const [isRetryingCamera, setIsRetryingCamera] = useState<boolean>(false);
 
   // 1. Получаем камеру один раз
   useEffect(() => {
     // Check if we're in the browser environment
     if (typeof window !== "undefined" && navigator.mediaDevices) {
-      console.log("🎥 Attempting to get camera access");
-      navigator.mediaDevices
-        .getUserMedia({ video: true, audio: true })
-        .then((localStream) => {
-          console.log("🎥 Camera access granted");
-          setStream(localStream);
-          if (userVideo.current && !userVideo.current.srcObject) {
-            userVideo.current.srcObject = localStream;
-          }
-        })
-        .catch((err) => {
-          console.error("🚫 Camera access error:", err);
-          alert("Ошибка доступа к камере.");
-        });
+      requestCameraAccess();
     } else {
       console.warn("⚠️ Not in browser or mediaDevices not available");
+      setCameraStatus("Camera API not available in this browser");
     }
   }, []);
+
+  // Function to request camera access with retry capability
+  const requestCameraAccess = () => {
+    console.log("🎥 Attempting to get camera access");
+    setCameraStatus("Requesting camera access...");
+
+    navigator.mediaDevices
+      .getUserMedia({ video: true, audio: true })
+      .then((localStream) => {
+        console.log("🎥 Camera access granted");
+        setCameraStatus("Camera access granted");
+        setStream(localStream);
+        if (userVideo.current && !userVideo.current.srcObject) {
+          userVideo.current.srcObject = localStream;
+        }
+        setIsRetryingCamera(false);
+      })
+      .catch((err) => {
+        console.error("🚫 Camera access error:", err);
+        setCameraStatus(`Camera access denied: ${err.message}`);
+        setIsRetryingCamera(false);
+      });
+  };
+
+  // Function to retry camera access
+  const retryCameraAccess = () => {
+    setIsRetryingCamera(true);
+    requestCameraAccess();
+  };
 
   // 2. Подключаем WebSocket и Peer когда stream готов
   useEffect(() => {
@@ -250,6 +271,9 @@ export default function VideoCallPage() {
             } else if (!stream && otherUsers.length > 0) {
               console.warn(
                 "⚠️ Cannot initialize peer: stream not available yet"
+              );
+              setCameraStatus(
+                "Camera access required to connect with other users"
               );
             }
           }
@@ -561,6 +585,17 @@ export default function VideoCallPage() {
     <div className="flex flex-col items-center justify-center h-screen gap-4 bg-gray-100">
       <div className="text-2xl font-semibold">Room: {roomId}</div>
       <div className="text-sm text-gray-500 mb-2">{connectionStatus}</div>
+      <div className="text-sm text-gray-500 mb-2">Camera: {cameraStatus}</div>
+
+      {/* Camera retry button */}
+      {!stream && !isRetryingCamera && (
+        <button
+          onClick={retryCameraAccess}
+          className="mb-4 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+        >
+          Retry Camera Access
+        </button>
+      )}
 
       {/* Add test button */}
       <button
@@ -573,13 +608,19 @@ export default function VideoCallPage() {
       <div className="flex flex-wrap justify-center gap-8 w-full max-w-4xl">
         <div className="flex flex-col items-center border-2 border-blue-400 rounded-lg p-2 bg-white shadow-md">
           <p className="text-center font-medium text-blue-600 mb-1">You</p>
-          <video
-            playsInline
-            muted
-            ref={userVideo}
-            autoPlay
-            className="w-80 h-60 bg-black rounded object-cover"
-          />
+          {stream ? (
+            <video
+              playsInline
+              muted
+              ref={userVideo}
+              autoPlay
+              className="w-80 h-60 bg-black rounded object-cover"
+            />
+          ) : (
+            <div className="w-80 h-60 bg-black rounded flex items-center justify-center">
+              <p className="text-white text-center p-4">Camera not available</p>
+            </div>
+          )}
         </div>
         <div className="flex flex-col items-center border-2 border-green-400 rounded-lg p-2 bg-white shadow-md">
           <p className="text-center font-medium text-green-600 mb-1">Partner</p>
