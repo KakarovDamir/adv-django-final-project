@@ -40,6 +40,14 @@ export default function VideoCallPage() {
     console.log("🎥 Attempting to get camera access");
     setCameraStatus("Requesting camera access...");
 
+    // Check if mediaDevices API is available
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.error("🚫 MediaDevices API not available in this browser");
+      setCameraStatus("Camera API not supported by your browser");
+      setIsRetryingCamera(false);
+      return;
+    }
+
     navigator.mediaDevices
       .getUserMedia({ video: true, audio: true })
       .then((localStream) => {
@@ -62,6 +70,14 @@ export default function VideoCallPage() {
   const retryCameraAccess = () => {
     setIsRetryingCamera(true);
     requestCameraAccess();
+  };
+
+  // Function to join without camera
+  const joinWithoutCamera = () => {
+    console.log("👤 Joining without camera");
+    setCameraStatus("Joined without camera");
+    setIsRetryingCamera(false);
+    // You can still participate in the call, but won't send video
   };
 
   // 2. Подключаем WebSocket и Peer когда stream готов
@@ -587,14 +603,22 @@ export default function VideoCallPage() {
       <div className="text-sm text-gray-500 mb-2">{connectionStatus}</div>
       <div className="text-sm text-gray-500 mb-2">Camera: {cameraStatus}</div>
 
-      {/* Camera retry button */}
+      {/* Camera buttons */}
       {!stream && !isRetryingCamera && (
-        <button
-          onClick={retryCameraAccess}
-          className="mb-4 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-        >
-          Retry Camera Access
-        </button>
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={retryCameraAccess}
+            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+          >
+            Retry Camera Access
+          </button>
+          <button
+            onClick={joinWithoutCamera}
+            className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+          >
+            Join Without Camera
+          </button>
+        </div>
       )}
 
       {/* Add test button */}
