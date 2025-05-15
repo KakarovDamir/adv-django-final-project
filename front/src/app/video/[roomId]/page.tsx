@@ -44,7 +44,7 @@ export default function VideoCallPage() {
   useEffect(() => {
     if (!roomId || !stream || typeof window === "undefined") return;
 
-    // Use secure WebSocket URL with wss protocol
+    // Try different WebSocket URL formats
     const wsUrl = `ws://138.68.87.67:8000/ws/call/${roomId}/`;
     console.log("🔌 Connecting to WebSocket:", wsUrl);
     setConnectionStatus("Connecting to WebSocket...");
@@ -80,12 +80,33 @@ export default function VideoCallPage() {
         "WebSocket connection failed. Trying alternative connection..."
       );
 
-      // Try alternative connection with ws:// protocol as fallback
-      const alternativeUrl = `ws://138.68.87.67:8000/ws/call/${roomId}/`;
+      // Try alternative connection paths
+      const alternativeUrls = [
+        `ws://138.68.87.67:8000/ws/call/${roomId}/`,
+        `ws://138.68.87.67:8000/ws/chat/${roomId}/`,
+        `ws://138.68.87.67:8000/ws/video/${roomId}/`,
+        `ws://138.68.87.67:8000/social_network/ws/call/${roomId}/`,
+      ];
+
+      tryAlternativeConnections(alternativeUrls, 0);
+    };
+
+    // Function to try alternative WebSocket connections
+    const tryAlternativeConnections = (urls: string[], index: number) => {
+      if (index >= urls.length) {
+        console.error("❌ All WebSocket connection attempts failed");
+        setConnectionStatus("All WebSocket connection attempts failed");
+        return;
+      }
+
+      const alternativeUrl = urls[index];
       console.log(
-        "🔄 Trying alternative WebSocket connection:",
+        `🔄 Trying alternative WebSocket connection (${index + 1}/${
+          urls.length
+        }):`,
         alternativeUrl
       );
+      setConnectionStatus(`Trying connection ${index + 1}/${urls.length}...`);
 
       if (socketRef.current) {
         socketRef.current.close();
@@ -94,8 +115,8 @@ export default function VideoCallPage() {
       socketRef.current = new WebSocket(alternativeUrl) as CustomWebSocket;
 
       socketRef.current.onopen = () => {
-        console.log("✅ Alternative WebSocket connected");
-        setConnectionStatus("Alternative WebSocket connected");
+        console.log(`✅ Alternative WebSocket connected to ${alternativeUrl}`);
+        setConnectionStatus(`Connected to ${alternativeUrl}`);
 
         if (
           socketRef.current &&
@@ -113,157 +134,183 @@ export default function VideoCallPage() {
         }
       };
 
-      socketRef.current.onerror = (innerErr) => {
-        console.error("❌ All WebSocket connection attempts failed:", innerErr);
-        setConnectionStatus("All WebSocket connection attempts failed");
+      socketRef.current.onerror = () => {
+        console.log(`❌ Failed to connect to ${alternativeUrl}`);
+        // Try the next URL
+        tryAlternativeConnections(urls, index + 1);
+      };
+
+      // Set up message handler for this connection
+      setupMessageHandler();
+    };
+
+    // Setup message handler function
+    const setupMessageHandler = () => {
+      if (!socketRef.current) return;
+
+      socketRef.current.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log("📩 Получено сообщение:", data);
+          const signal = data.data;
+
+          // Handle room status message to initialize connections with other users
+          if (signal?.type === "room_status") {
+            console.log("🏠 Получен статус комнаты:", signal.users);
+            setConnectionStatus(
+              `Room joined with ${signal.users.length} users`
+            );
+
+            // If we're the only user, don't try to create a peer connection
+            if (signal.users.length <= 1) {
+              console.log(
+                "👤 Only one user in room, waiting for others to join"
+              );
+              return;
+            }
+
+            // Save my user ID if it's in the room
+            const myUserId = signal.users.find((id: string) =>
+              id.includes(socketRef.current?._mySelfId || "unknown")
+            );
+
+            // To ensure consistent role assignments, use numeric comparison of user IDs
+            // This prevents role flip-flops when users join/leave
+            const myUserNumber = myUserId
+              ? parseInt(myUserId.split("-")[1])
+              : 0;
+
+            // Get other users (not me)
+            const otherUsers = signal.users.filter(
+              (id: string) =>
+                !id.includes(socketRef.current?._mySelfId || "unknown")
+            );
+
+            console.log(
+              `👤 My user ID is ${myUserId}, other users: ${JSON.stringify(
+                otherUsers
+              )}`
+            );
+
+            // Only initialize a new peer connection if we don't have one
+            // or if this is the first time seeing another user
+            if (!peerRef.current && otherUsers.length > 0) {
+              // We'll always make the user with the lower numeric ID the initiator
+              // This ensures consistent role assignments
+              const shouldBeInitiator =
+                myUserNumber < parseInt(otherUsers[0].split("-")[1]);
+
+              console.log(
+                `👤 My user number is ${myUserNumber}, should be initiator: ${shouldBeInitiator}`
+              );
+
+              console.log(
+                `🔄 Initializing peer connection as ${
+                  shouldBeInitiator ? "initiator" : "receiver"
+                }`
+              );
+              initializePeerConnection(shouldBeInitiator);
+            }
+          }
+
+          // Handle other message types
+          if (signal?.type === "offer") {
+            handleOfferSignal(signal);
+          }
+
+          if (signal?.type === "answer") {
+            handleAnswerSignal(signal);
+          }
+        } catch (error) {
+          console.error("❌ Ошибка при обработке сообщения:", error);
+        }
       };
     };
 
-    socketRef.current.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log("📩 Получено сообщение:", data);
-        const signal = data.data;
+    // Set up the message handler for the initial connection
+    setupMessageHandler();
 
-        // Handle room status message to initialize connections with other users
-        if (signal?.type === "room_status") {
-          console.log("🏠 Получен статус комнаты:", signal.users);
-          setConnectionStatus(`Room joined with ${signal.users.length} users`);
+    // Handler for offer signals
+    const handleOfferSignal = (signal: any) => {
+      console.log("📞 Получен offer от peer");
 
-          // If we're the only user, don't try to create a peer connection
-          if (signal.users.length <= 1) {
-            console.log("👤 Only one user in room, waiting for others to join");
-            return;
-          }
+      if (!peerRef.current) {
+        console.log("🔄 Создаем peer connection для ответа на offer");
 
-          // Save my user ID if it's in the room
-          const myUserId = signal.users.find((id: string) =>
-            id.includes(socketRef.current?._mySelfId || "unknown")
-          );
+        // Initialize peer as non-initiator since we're answering
+        const peer = new Peer({
+          initiator: false,
+          trickle: false,
+          stream: stream,
+          config: {
+            iceServers: [
+              { urls: "stun:stun.l.google.com:19302" },
+              { urls: "stun:global.stun.twilio.com:3478" },
+              { urls: "stun:stun.stunprotocol.org:3478" },
+            ],
+          },
+        });
 
-          // To ensure consistent role assignments, use numeric comparison of user IDs
-          // This prevents role flip-flops when users join/leave
-          const myUserNumber = myUserId ? parseInt(myUserId.split("-")[1]) : 0;
-
-          // Get other users (not me)
-          const otherUsers = signal.users.filter(
-            (id: string) =>
-              !id.includes(socketRef.current?._mySelfId || "unknown")
-          );
-
-          console.log(
-            `👤 My user ID is ${myUserId}, other users: ${JSON.stringify(
-              otherUsers
-            )}`
-          );
-
-          // Only initialize a new peer connection if we don't have one
-          // or if this is the first time seeing another user
-          if (!peerRef.current && otherUsers.length > 0) {
-            // We'll always make the user with the lower numeric ID the initiator
-            // This ensures consistent role assignments
-            const shouldBeInitiator =
-              myUserNumber < parseInt(otherUsers[0].split("-")[1]);
-
-            console.log(
-              `👤 My user number is ${myUserNumber}, should be initiator: ${shouldBeInitiator}`
+        peer.on("signal", (signalData: any) => {
+          console.log("📤 Отправляем ответ на offer");
+          if (socketRef.current?.readyState === WebSocket.OPEN) {
+            socketRef.current.send(
+              JSON.stringify({ type: "answer", signal: signalData })
             );
-
-            console.log(
-              `🔄 Initializing peer connection as ${
-                shouldBeInitiator ? "initiator" : "receiver"
-              }`
-            );
-            initializePeerConnection(shouldBeInitiator);
           }
+        });
+
+        peer.on("stream", (remoteStream: MediaStream) => {
+          console.log("📺 Получен remoteStream от peer с ID:", remoteStream.id);
+          handleRemoteStream(remoteStream);
+        });
+
+        peer.on("track", (track: MediaStreamTrack, stream: MediaStream) => {
+          console.log("🎮 Получен track:", track.kind);
+          handleRemoteStream(stream);
+        });
+
+        peer.on("error", (err: Error) => {
+          console.error("❌ Peer ошибка (answerer):", err);
+        });
+
+        peer.on("connect", () => {
+          console.log("✅ Peer connection established (answerer)");
+          setConnectionStatus("Peer connection established");
+        });
+
+        try {
+          console.log("🔄 Применяем полученный offer signal");
+          peer.signal(signal.signal);
+        } catch (err) {
+          console.error("🚫 Ошибка при signal(offer):", err);
         }
 
-        if (signal?.type === "offer") {
-          console.log("📞 Получен offer от peer");
-
-          if (!peerRef.current) {
-            console.log("🔄 Создаем peer connection для ответа на offer");
-
-            // Initialize peer as non-initiator since we're answering
-            const peer = new Peer({
-              initiator: false,
-              trickle: false,
-              stream: stream,
-              config: {
-                iceServers: [
-                  { urls: "stun:stun.l.google.com:19302" },
-                  { urls: "stun:global.stun.twilio.com:3478" },
-                  { urls: "stun:stun.stunprotocol.org:3478" },
-                ],
-              },
-            });
-
-            peer.on("signal", (signalData: any) => {
-              console.log("📤 Отправляем ответ на offer");
-              if (socketRef.current?.readyState === WebSocket.OPEN) {
-                socketRef.current.send(
-                  JSON.stringify({ type: "answer", signal: signalData })
-                );
-              }
-            });
-
-            peer.on("stream", (remoteStream: MediaStream) => {
-              console.log(
-                "📺 Получен remoteStream от peer с ID:",
-                remoteStream.id
-              );
-              handleRemoteStream(remoteStream);
-            });
-
-            peer.on("track", (track: MediaStreamTrack, stream: MediaStream) => {
-              console.log("🎮 Получен track:", track.kind);
-              handleRemoteStream(stream);
-            });
-
-            peer.on("error", (err: Error) => {
-              console.error("❌ Peer ошибка (answerer):", err);
-            });
-
-            peer.on("connect", () => {
-              console.log("✅ Peer connection established (answerer)");
-              setConnectionStatus("Peer connection established");
-            });
-
-            try {
-              console.log("🔄 Применяем полученный offer signal");
-              peer.signal(signal.signal);
-            } catch (err) {
-              console.error("🚫 Ошибка при signal(offer):", err);
-            }
-
-            peerRef.current = peer;
-          } else {
-            console.warn("⚠️ Игнорируем повторный offer: peer уже существует");
-            // Even if we have a peer, we should still process the offer
-            try {
-              peerRef.current.signal(signal.signal);
-            } catch (err) {
-              console.error("🚫 Ошибка при обновлении signal(offer):", err);
-            }
-          }
+        peerRef.current = peer;
+      } else {
+        console.warn("⚠️ Игнорируем повторный offer: peer уже существует");
+        // Even if we have a peer, we should still process the offer
+        try {
+          peerRef.current.signal(signal.signal);
+        } catch (err) {
+          console.error("🚫 Ошибка при обновлении signal(offer):", err);
         }
+      }
+    };
 
-        if (signal?.type === "answer") {
-          console.log("📞 Получен answer от peer");
+    // Handler for answer signals
+    const handleAnswerSignal = (signal: any) => {
+      console.log("📞 Получен answer от peer");
 
-          if (peerRef.current) {
-            try {
-              console.log("🔄 Применяем полученный answer signal");
-              peerRef.current.signal(signal.signal);
-            } catch (err) {
-              console.error("🚫 Ошибка при signal(answer):", err);
-            }
-          } else {
-            console.warn("⚠️ Ответ получен, но peer не существует");
-          }
+      if (peerRef.current) {
+        try {
+          console.log("🔄 Применяем полученный answer signal");
+          peerRef.current.signal(signal.signal);
+        } catch (err) {
+          console.error("🚫 Ошибка при signal(answer):", err);
         }
-      } catch (error) {
-        console.error("❌ Ошибка при обработке сообщения:", error);
+      } else {
+        console.warn("⚠️ Ответ получен, но peer не существует");
       }
     };
 
