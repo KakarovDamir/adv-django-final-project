@@ -11,14 +11,9 @@ export default function ChatRoom() {
   >([]);
   const [input, setInput] = useState("");
   const [connectionStatus, setConnectionStatus] =
-    useState<string>("Connecting...");
+    useState<string>("Initializing...");
   const [errorMessage, setErrorMessage] = useState<string>("");
-  // Generate a random username with 4-digit ID
-  const username =
-    "User" +
-    Math.floor(Math.random() * 10000)
-      .toString()
-      .padStart(4, "0");
+  const [username, setUsername] = useState<string | null>(null);
 
   // Debug function to log with timestamp
   const logWithTime = (msg: string, data?: any) => {
@@ -30,19 +25,44 @@ export default function ChatRoom() {
     }
   };
 
+  // Effect to set username (runs only on client)
   useEffect(() => {
-    if (!room) return;
+    let storedUsername = localStorage.getItem("chatUsername");
+    if (!storedUsername) {
+      storedUsername =
+        "User" +
+        Math.floor(Math.random() * 10000)
+          .toString()
+          .padStart(4, "0");
+      localStorage.setItem("chatUsername", storedUsername);
+    }
+    setUsername(storedUsername);
+    logWithTime("Username set to:", storedUsername);
+  }, []); // Empty dependency array, runs once on mount
+
+  useEffect(() => {
+    if (!room || !username) {
+      if (!username) logWithTime("Waiting for username to be set...");
+      if (!room) logWithTime("Waiting for room to be available...");
+      return;
+    }
+
+    logWithTime(`Username is ${username}, room is ${room}. Initializing WebSocket.`);
+    setConnectionStatus("Connecting...");
 
     // Determine WebSocket connection options
     const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+    const backendHost = "localhost:8000"; // Explicitly set backend host and port
 
-    // Use the current host by default (should work in most cases)
-    let wsUrl = `${protocol}${window.location.host}/ws/chat/${room}/`;
+    let wsUrl = `${protocol}${backendHost}/ws/chat/${room}/`;
 
     logWithTime(`🔄 Connecting to WebSocket at: ${wsUrl}`);
-    setConnectionStatus("Connecting to WebSocket server...");
 
     // Create and set up WebSocket connection
+    if (socketRef.current) {
+        logWithTime("Cleaning up existing WebSocket before reconnecting.");
+        socketRef.current.close();
+    }
     socketRef.current = new WebSocket(wsUrl);
 
     socketRef.current.onopen = () => {
@@ -144,11 +164,13 @@ export default function ChatRoom() {
     // Handle connection close
     socketRef.current.onclose = (event) => {
       logWithTime(`WebSocket closed: ${event.code} ${event.reason}`);
-      setConnectionStatus("Disconnected from chat server");
-
-      if (event.code !== 1000) {
-        // Normal closure
+      if (event.code !== 1000 && event.code !== 1005 && !process.env.NEXT_PUBLIC_WS_URL) {
+        setConnectionStatus("Disconnected from chat server");
         setErrorMessage(`Connection closed unexpectedly (${event.code})`);
+      } else if (event.code !== 1000 && event.code !== 1005) {
+        setConnectionStatus("Attempting fallback connection...");
+      } else {
+        setConnectionStatus("Disconnected from chat server");
       }
     };
 
@@ -177,7 +199,7 @@ export default function ChatRoom() {
   const sendMessage = () => {
     const trimmedInput = input.trim();
 
-    if (!trimmedInput) return;
+    if (!trimmedInput || !username) return;
 
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       const messageObj = {
@@ -190,10 +212,10 @@ export default function ChatRoom() {
       socketRef.current.send(JSON.stringify(messageObj));
 
       // Add the message to local state immediately for better UX
-      setMessages((prev) => [
-        ...prev,
-        { username: username, message: trimmedInput, isLocal: true },
-      ]);
+      // setMessages((prev) => [
+      //   ...prev,
+      //   { username: username, message: trimmedInput, isLocal: true },
+      // ]);
 
       setInput("");
     } else {
@@ -208,7 +230,7 @@ export default function ChatRoom() {
       <h2 className="text-xl font-bold mb-4">Chat Room: {room}</h2>
       <div className="flex items-center gap-2 mb-2">
         <div className="text-sm text-gray-500">{connectionStatus}</div>
-        <div className="text-xs text-blue-500">Your name: {username}</div>
+        <div className="text-xs text-blue-500">Your name: {username || "Loading..."}</div>
       </div>
       {errorMessage && (
         <div className="text-sm text-red-500 mb-2">{errorMessage}</div>

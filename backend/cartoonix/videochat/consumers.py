@@ -45,8 +45,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 logger.info(f"Chat message received in room {self.room_name} from {username}")
             
             # If user is authenticated, use their real username
-            if self.scope["user"].is_authenticated:
-                username = self.scope["user"].username
+            # if self.scope["user"].is_authenticated:  # Commented out
+            #     username = self.scope["user"].username # Commented out
                 
             # Send to group
             await self.channel_layer.group_send(

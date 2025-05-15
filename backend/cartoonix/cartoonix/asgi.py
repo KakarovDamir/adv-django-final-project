@@ -6,7 +6,8 @@ import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cartoonix.settings')
 django.setup()  # This must come before other imports
 
-import videochat.routing  # Must be imported after Django setup
+import videochat.routing # Only videochat.routing is needed now
+# import social_network.routing # This line should be removed or commented out
 from channels.auth import AuthMiddlewareStack
 # Now import specific Django modules
 from channels.routing import ProtocolTypeRouter, URLRouter
@@ -18,7 +19,7 @@ application = ProtocolTypeRouter({
     "websocket": AllowedHostsOriginValidator(
         AuthMiddlewareStack(
             URLRouter(
-                videochat.routing.websocket_urlpatterns
+                videochat.routing.websocket_urlpatterns # Use only videochat routes
             )
         )
     ),
