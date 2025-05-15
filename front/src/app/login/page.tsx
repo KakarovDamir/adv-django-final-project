@@ -14,6 +14,11 @@ export default function LoginPage() {
     const formData = new FormData(e.currentTarget as HTMLFormElement);
 
     try {
+      // Get CSRF token first
+      await fetch("http://138.68.87.67:8000/social_network/auth/csrf/", {
+        credentials: "include",
+      });
+
       const res = await fetch(
         "http://138.68.87.67:8000/social_network/auth/login/",
         {
@@ -31,12 +36,31 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok) {
+        // Store user data
         localStorage.setItem("user", JSON.stringify(data.user));
+
+        // Store token if it exists in the response
+        if (data.token) {
+          localStorage.setItem("token", data.token);
+        } else {
+          // If no token in response, we might be using session auth only
+          console.log("No token in response, using session authentication");
+        }
+
+        console.log("Login successful:", {
+          user: data.user,
+          hasToken: !!data.token,
+          csrfToken:
+            document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "No CSRF token",
+        });
+
         router.push("/home");
       } else {
         setError(data.error || "Invalid credentials");
+        console.error("Login failed:", data);
       }
     } catch (err) {
+      console.error("Connection error:", err);
       setError("Connection error");
     } finally {
       setIsLoading(false);

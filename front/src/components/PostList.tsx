@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useInView } from "react-intersection-observer";
+import { useAuth } from "../lib/AuthContext";
 import { csrfFetch } from "../lib/csrf";
 import PostItem from "./PostItem";
 
@@ -11,6 +12,7 @@ export default function PostList() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { ref, inView } = useInView();
+  const { refreshAuth } = useAuth();
 
   useEffect(() => {
     if (inView && hasMore && !loading) {
@@ -32,13 +34,35 @@ export default function PostList() {
 
         if (res.status === 403) {
           console.error("Authentication error:", errorMessage);
-          // Try to refresh the token or redirect to login if needed
-          if (typeof window !== "undefined") {
-            const isLoggedIn = !!localStorage.getItem("token");
-            if (!isLoggedIn) {
-              window.location.href = "/login";
+
+          // Try to refresh the auth
+          const refreshSuccess = await refreshAuth();
+
+          if (refreshSuccess) {
+            // Try the request again
+            console.log("Auth refreshed, retrying request");
+            const retriedRes = await csrfFetch(
+              `http://138.68.87.67:8000/social_network/posts/?page=${page}`
+            );
+
+            if (retriedRes.ok) {
+              const data = await retriedRes.json();
+              const receivedPosts = data.results ? data.results : data;
+              const hasMore = data.next ? data.next !== null : false;
+
+              setPosts((prev) => [...prev, ...receivedPosts]);
+              setHasMore(hasMore);
+              setPage((prev) => prev + 1);
+              setError(null);
+              setLoading(false);
               return;
             }
+          }
+
+          // If refresh didn't work or retry failed, redirect to login
+          if (typeof window !== "undefined") {
+            window.location.href = "/login";
+            return;
           }
         }
 
